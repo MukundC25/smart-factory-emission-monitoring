@@ -16,11 +16,6 @@ This project uses AI and geospatial data to identify factories contributing to p
 - FastAPI / Flask
 - React / Leaflet (for map visualization)
 
-## Team Members
-- Mukund Chavan
-- Member 2
-- Member 3
-
 ## Setup
 
 Clone repo:
@@ -41,3 +36,4 @@ python main.py
 - Real-time pollution monitoring
 - Satellite data integration
 - Government dashboard
+
