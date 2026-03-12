@@ -11,10 +11,6 @@ This project uses AI and geospatial data to identify factories contributing to p
 
 ## Overall System Architecture
 
-Mukund, for your project **“Smart Factory Emission Monitoring and Pollution Control Recommendation System”**, the best architecture is one that is **simple enough for a college project but still looks like a real production system**.
-
-We’ll use a **4-layer architecture**:
-
 **Frontend → Backend API → AI/ML Service → Database + Data Sources**
 
 ---
@@ -388,41 +384,6 @@ Results → Frontend Map
 
 ---
 
-# 🔥 Pro Upgrade (If You Want This Project to Look CRAZY GOOD)
-
-Add:
-
-### 1️⃣ Pollution Spread Simulation
-
-Use wind data.
-
-```
-Wind direction + factory emissions
-→ simulate pollution spread
-```
-
----
-
-### 2️⃣ Pollution Risk Score
-
-```
-Factory Pollution Score
-+ Population Density
-+ Distance from city
-```
-
----
-
-### 3️⃣ Satellite Data
-
-Use:
-
-```
-NASA Air Quality API
-```
-
----
-
 
 ## Setup
 
@@ -444,5 +405,6 @@ python main.py
 - Real-time pollution monitoring
 - Satellite data integration
 - Government dashboard
+
 
 
