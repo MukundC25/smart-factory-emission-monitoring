@@ -345,7 +345,8 @@ def _parse_datagov_record(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     try:
         timestamp = pd.to_datetime(timestamp_raw, utc=True).isoformat()
     except Exception:
-        timestamp = datetime.now(timezone.utc).isoformat()
+        # Skip records with invalid timestamps to avoid distorting time-series data.
+        return None
 
     return {
         "station_name": station,
@@ -407,10 +408,15 @@ def _fetch_pollution_from_cpcb(config: Dict[str, Any], target_cities: set[str]) 
 def _load_kaggle_backfill(
     config: Dict[str, Any],
     target_cities: set[str],
-    existing_timestamp_keys: set[str],
+    existing_record_keys: set[str],
 ) -> List[Dict[str, Any]]:
-    backfill_path = get_project_root() / config["paths"].get("kaggle_backfill", "")
-    if not str(backfill_path) or not backfill_path.exists():
+    kaggle_rel = config["paths"].get("kaggle_backfill")
+    if not kaggle_rel:
+        LOGGER.info("Kaggle backfill path not configured; skipping")
+        return []
+
+    backfill_path = get_project_root() / kaggle_rel
+    if not backfill_path.exists():
         LOGGER.info("Kaggle backfill not found at %s; skipping", backfill_path)
         return []
 
@@ -440,9 +446,15 @@ def _load_kaggle_backfill(
             )
         ]
 
-    if existing_timestamp_keys:
-        dataset_keys = dataset["timestamp"].dt.strftime("%Y-%m-%dT%H:%M:%S")
-        dataset = dataset[~dataset_keys.isin(existing_timestamp_keys)]
+    if existing_record_keys:
+        dataset_keys = dataset.apply(
+            lambda row: _build_backfill_record_key(
+                station_name=str(row.get("station_name", "Unknown Station")),
+                timestamp_value=row["timestamp"],
+            ),
+            axis=1,
+        )
+        dataset = dataset[~dataset_keys.isin(existing_record_keys)]
 
     rows: List[Dict[str, Any]] = []
     for _, row in dataset.iterrows():
@@ -468,6 +480,15 @@ def _load_kaggle_backfill(
 
 def _synthetic_allowed() -> bool:
     return os.getenv("ALLOW_SYNTHETIC_DATA", "false").lower() in {"1", "true", "yes"}
+
+
+def _build_backfill_record_key(station_name: str, timestamp_value: Any) -> str:
+    """Build a stable station+timestamp key (seconds precision) for backfill suppression."""
+    normalized_station = station_name.strip().lower()
+    parsed_timestamp = pd.to_datetime(timestamp_value, errors="coerce", utc=True)
+    if pd.isna(parsed_timestamp):
+        return ""
+    return f"{normalized_station}|{parsed_timestamp.strftime('%Y-%m-%dT%H:%M:%S')}"
 
 
 def _generate_synthetic_pollution(factories: pd.DataFrame, row_count: int = 500) -> List[Dict[str, Any]]:
@@ -538,12 +559,14 @@ def _distance_to_nearest_factory(
 
     distances: List[float] = []
     keep: List[bool] = []
+    missing_coordinate_flags: List[bool] = []
     for row in pollution_df.itertuples(index=False):
         slat = float(row.station_lat) if pd.notna(row.station_lat) else np.nan
         slon = float(row.station_lon) if pd.notna(row.station_lon) else np.nan
         if np.isnan(slat) or np.isnan(slon):
             distances.append(np.nan)
             keep.append(True)
+            missing_coordinate_flags.append(True)
             continue
 
         city_key = str(getattr(row, "city", ""))
@@ -551,9 +574,11 @@ def _distance_to_nearest_factory(
         distance = _min_haversine(slat, slon, flats, flons)
         distances.append(distance)
         keep.append(distance <= threshold_km)
+        missing_coordinate_flags.append(False)
 
     filtered = pollution_df.copy()
     filtered["nearest_factory_distance_km"] = distances
+    filtered["station_coordinates_missing"] = missing_coordinate_flags
     filtered = filtered.loc[keep].reset_index(drop=True)
     LOGGER.info("Spatial filter kept %s/%s rows", len(filtered), len(pollution_df))
     return filtered
@@ -586,7 +611,7 @@ def collect_pollution_data(config: Optional[Dict[str, Any]] = None) -> pd.DataFr
             city_centres[city] = CITY_CENTRES[city]
 
     rows: List[Dict[str, Any]] = []
-    covered_timestamp_keys: set[str] = set()
+    covered_record_keys: set[str] = set()
 
     for source in source_order:
         if source == "openaq":
@@ -594,7 +619,7 @@ def collect_pollution_data(config: Optional[Dict[str, Any]] = None) -> pd.DataFr
         elif source == "cpcb":
             source_rows = _fetch_pollution_from_cpcb(runtime_config, target_cities)
         elif source == "kaggle_backfill":
-            source_rows = _load_kaggle_backfill(runtime_config, target_cities, covered_timestamp_keys)
+            source_rows = _load_kaggle_backfill(runtime_config, target_cities, covered_record_keys)
         else:
             LOGGER.warning("Unknown pollution source %s; skipping", source)
             continue
@@ -602,9 +627,12 @@ def collect_pollution_data(config: Optional[Dict[str, Any]] = None) -> pd.DataFr
         if source_rows:
             rows.extend(source_rows)
             for item in source_rows:
-                timestamp_key = str(item.get("timestamp", ""))[:19]
-                if timestamp_key:
-                    covered_timestamp_keys.add(timestamp_key)
+                record_key = _build_backfill_record_key(
+                    station_name=str(item.get("station_name", "Unknown Station")),
+                    timestamp_value=item.get("timestamp", ""),
+                )
+                if record_key:
+                    covered_record_keys.add(record_key)
             LOGGER.info("Source %s contributed %s rows (total %s)", source, len(source_rows), len(rows))
 
     if not rows:
