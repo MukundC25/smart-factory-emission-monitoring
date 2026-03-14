@@ -1,0 +1,15 @@
+# Python cache and virtual env
+__pycache__/
+*.py[cod]
+.venv/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Runtime artifacts
+data/output/pipeline.log
+
+# Local secrets
+.env
+.env.*
+!.env.example

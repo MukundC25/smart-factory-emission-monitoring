@@ -1,303 +1,217 @@
-# Smart Factory Emission Monitoring and Pollution Control Recommendation System
+# Smart Factory Emission Monitoring and Pollution Control
 
-## Overview
-This project uses AI and geospatial data to identify factories contributing to pollution in a city and recommend pollution control strategies.
+Production-grade Python pipeline for collecting industrial geospatial data, building a pollution impact model, generating factory recommendations, and exporting an interactive map dashboard.
 
-## Features
-- Map-based factory visualization
-- Pollution impact analysis
-- AI-based emission prediction
-- Pollution control recommendations
-
-## Overall System Architecture
-
-**Frontend → Backend API → AI/ML Service → Database + Data Sources**
-
----
-
-# Overall System Architecture
+## Architecture
 
 ```
-User
-   ↓
-Frontend (React + Map UI)
-   ↓
-Backend API (FastAPI / Flask)
-   ↓
-AI/ML Engine
-   ↓
-Database + External APIs
+                  +--------------------------+
+                  |      Overpass / OSM      |
+                  +------------+-------------+
+                               |
+                  +------------v-------------+
+                  |      OpenAQ / CPCB       |
+                  +------------+-------------+
+                               |
+                 +-------------v--------------+
+                 |  Ingestion (Factory + Air) |
+                 +-------------+--------------+
+                               |
+                 +-------------v--------------+
+                 |     Data Validation         |
+                 |  Imputation + Range Check   |
+                 +-------------+--------------+
+                               |
+                 +-------------v--------------+
+                 |     Feature Engineering     |
+                 | Spatial Join + Rolling FE   |
+                 +-------------+--------------+
+                               |
+                 +-------------v--------------+
+                 |   ML Training (RF/XGBoost)  |
+                 +-------------+--------------+
+                               |
+            +------------------+------------------+
+            |                                     |
+ +----------v-----------+             +-----------v-----------+
+ | Recommendation Engine|             | Folium Dashboard      |
+ | risk band + controls |             | markers + heatmap     |
+ +----------------------+             +-----------------------+
 ```
 
-Flow:
+## Repository Layout
 
 ```
-Factories Data → Backend → ML Model → Pollution Impact Score
-                                   ↓
-                              Recommendation Engine
-                                   ↓
-                           Results shown on Map Dashboard
+smart-factory-emission-monitoring/
+├── data/
+│   ├── raw/
+│   │   ├── factories/
+│   │   └── pollution/
+│   ├── processed/
+│   └── output/
+├── src/
+│   ├── ingestion/
+│   │   ├── factory_collector.py
+│   │   └── pollution_collector.py
+│   ├── processing/
+│   │   ├── data_validator.py
+│   │   └── feature_engineering.py
+│   ├── ml/
+│   │   ├── train.py
+│   │   └── predict.py
+│   ├── recommendations/
+│   │   └── engine.py
+│   └── visualization/
+│       └── dashboard.py
+├── notebooks/
+│   └── eda.ipynb
+├── models/
+├── main.py
+├── config.yaml
+├── requirements.txt
+├── .env.example
+└── backend/
 ```
 
----
+## Setup
 
-# 1️⃣ Frontend Layer (User Interface)
+1. Create virtual environment:
 
-### Tech
-
-* **React**
-* **Leaflet.js** or **Mapbox**
-* **Chart.js / Recharts**
-
-### Responsibilities
-
-1. Display **city map**
-2. Show **factory markers**
-3. Show **pollution heatmap**
-4. Show **analytics dashboard**
-5. Display **AI recommendations**
-
-### Example UI
-
-Map view
-
-```
-● Factory A
-● Factory B
-● Factory C
+```bash
+python -m venv .venv
 ```
 
-Click marker →
+2. Activate environment:
 
-```
-Factory Name
-Pollution Score
-Recommendation
-```
-
-### Frontend Structure
-
-```
-frontend
- ├── components
- │   ├── MapView
- │   ├── FactoryMarker
- │   ├── HeatmapLayer
- │
- ├── pages
- │   ├── Dashboard
- │   ├── FactoryDetails
- │
- └── services
-     └── api.js
+```bash
+# PowerShell
+.\.venv\Scripts\Activate.ps1
 ```
 
----
+3. Install dependencies:
 
-# 2️⃣ Backend API Layer
-
-### Tech
-
-**FastAPI (recommended)**
-
-Why?
-
-* Fast
-* Great for ML integration
-* Auto API docs
-
----
-
-### Responsibilities
-
-Backend acts as **bridge between frontend, ML model, and database**.
-
-Endpoints example:
-
-```
-GET /factories
-GET /pollution
-GET /factory/{id}
-GET /recommendation/{factory_id}
-POST /predict_pollution
+```bash
+pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
----
+4. Create runtime env file:
 
-### Backend Structure
-
-```
-backend
- ├── main.py
- ├── routes
- │   ├── factories.py
- │   ├── pollution.py
- │
- ├── services
- │   ├── ml_service.py
- │   ├── recommendation_service.py
- │
- ├── models
- │   ├── factory_model.py
- │   ├── pollution_model.py
- │
- └── database
-     └── db.py
+```bash
+copy .env.example .env
 ```
 
----
+5. Add API keys in `.env` if available:
 
-# 3️⃣ AI / ML Layer
-
-This is where your **intelligence happens**.
-
-Two modules:
-
-### 1️⃣ Pollution Impact Prediction
-
-Input
-
-```
-factory_type
-emission_level
-location
-pollution_data
+```env
+OPENAQ_API_KEY=
+GOOGLE_PLACES_API_KEY=
+LOG_LEVEL=INFO
 ```
 
-Model
+## Secrets Setup (Safe For GitHub)
 
-```
-Random Forest
-XGBoost
-Gradient Boost
-```
+1. Add keys only in the local file `.env` at project root:
 
-Output
-
-```
-Pollution Impact Score
+```env
+OPENAQ_API_KEY=your_openaq_key_here
+GOOGLE_PLACES_API_KEY=your_google_places_key_here
+DEFAULT_COUNTRY=India
+LOG_LEVEL=INFO
 ```
 
-Example
+2. Do not put keys in `.env.example`. Keep that file with empty values only.
+3. `.gitignore` already excludes `.env` and `.env.*`, and keeps `.env.example` tracked.
 
-```
-Factory A → 0.82 (High Impact)
-Factory B → 0.32 (Low Impact)
-```
+Verify secret protection:
 
----
-
-### 2️⃣ Recommendation Engine
-
-Can be:
-
-**Rule-based system**
-
-Example:
-
-```
-if SO2 > threshold
-→ install scrubber system
-
-if particulate matter high
-→ electrostatic precipitator
+```powershell
+git status
+git check-ignore -v .env
 ```
 
-Output example:
+Expected: `.env` is ignored and does not appear in staged/untracked changes.
 
-```
-Factory A
+## Run Full Pipeline
 
-Impact Score: 0.82
-Recommendation:
-Install SO2 scrubber system
-Upgrade filtration unit
+```bash
+python main.py
 ```
 
----
+## Test And Verify
 
-# 4️⃣ Database Layer
+Run unit tests:
 
-### Recommended
-
-**PostgreSQL**
-
-or
-
-**MongoDB**
-
----
-
-### Tables
-
-#### Factories
-
-```
-factory_id
-name
-industry_type
-latitude
-longitude
+```powershell
+pytest tests -q
 ```
 
----
+Run full pipeline and verify outputs:
 
-#### Pollution Data
-
-```
-pollution_id
-factory_id
-pm25
-pm10
-so2
-no2
-co
-timestamp
+```powershell
+python main.py
 ```
 
----
+Check generated files:
 
-#### Recommendations
-
-```
-rec_id
-factory_id
-impact_score
-recommendation
+```powershell
+Get-ChildItem data/output
+Get-Content data/output/pipeline.log -Tail 30
 ```
 
----
+Open dashboard:
 
-# 5️⃣ External Data Sources
-
-You will fetch real data from:
-
-### Factory Locations
-
-```
-OpenStreetMap API
+```powershell
+Start-Process data/output/dashboard.html
 ```
 
----
+Run API and test endpoints:
 
-### Pollution Data
-
-```
-OpenAQ API
-CPCB datasets
-Kaggle datasets
+```powershell
+uvicorn backend.app.main:app --reload
 ```
 
----
+In another terminal:
 
-# 6️⃣ Map & Geospatial Processing
-
-For spatial analysis use:
-
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/
+Invoke-RestMethod http://127.0.0.1:8000/factories/
+Invoke-RestMethod http://127.0.0.1:8000/pollution/
 ```
-GeoPandas
-Shapely
-Folium
+
+## Outputs
+
+- `data/raw/factories/factories.csv`
+- `data/raw/pollution/pollution_readings.csv`
+- `data/processed/ml_dataset.parquet`
+- `models/pollution_impact_model.pkl`
+- `models/scaler.pkl`
+- `models/model_report.json`
+- `data/output/recommendations.csv`
+- `data/output/dashboard.html`
+- `data/output/pipeline.log`
+
+## API (Existing Backend Skeleton)
+
+Run backend API:
+
+```bash
+uvicorn backend.app.main:app --reload
+```
+
+Available routes:
+
+- `GET /`
+- `GET /factories/`
+- `GET /pollution/`
+- `GET /recommendation/{factory_id}`
+
+## Notes
+
+- Factory ingestion uses Overpass first, then Google Places only when key exists.
+- Pollution ingestion uses OpenAQ first, then CPCB placeholder, then synthetic fallback.
+- Missing pollutant values are imputed by station median, then global median.
+- Out-of-range pollutant values are clipped to configured bounds in `config.yaml`.
 ```
 
 Example tasks:
