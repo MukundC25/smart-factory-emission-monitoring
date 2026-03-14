@@ -416,7 +416,7 @@ def _load_kaggle_backfill(
         return []
 
     backfill_path = get_project_root() / kaggle_rel
-    if not backfill_path.exists():
+    if not backfill_path.exists() or not backfill_path.is_file():
         LOGGER.info("Kaggle backfill not found at %s; skipping", backfill_path)
         return []
 
@@ -559,14 +559,14 @@ def _distance_to_nearest_factory(
 
     distances: List[float] = []
     keep: List[bool] = []
-    missing_coordinate_flags: List[bool] = []
+    dropped_missing_coordinates = 0
     for row in pollution_df.itertuples(index=False):
         slat = float(row.station_lat) if pd.notna(row.station_lat) else np.nan
         slon = float(row.station_lon) if pd.notna(row.station_lon) else np.nan
         if np.isnan(slat) or np.isnan(slon):
             distances.append(np.nan)
-            keep.append(True)
-            missing_coordinate_flags.append(True)
+            keep.append(False)
+            dropped_missing_coordinates += 1
             continue
 
         city_key = str(getattr(row, "city", ""))
@@ -574,13 +574,16 @@ def _distance_to_nearest_factory(
         distance = _min_haversine(slat, slon, flats, flons)
         distances.append(distance)
         keep.append(distance <= threshold_km)
-        missing_coordinate_flags.append(False)
 
     filtered = pollution_df.copy()
     filtered["nearest_factory_distance_km"] = distances
-    filtered["station_coordinates_missing"] = missing_coordinate_flags
     filtered = filtered.loc[keep].reset_index(drop=True)
-    LOGGER.info("Spatial filter kept %s/%s rows", len(filtered), len(pollution_df))
+    LOGGER.info(
+        "Spatial filter kept %s/%s rows (dropped %s rows with missing coordinates)",
+        len(filtered),
+        len(pollution_df),
+        dropped_missing_coordinates,
+    )
     return filtered
 
 
@@ -611,7 +614,7 @@ def collect_pollution_data(config: Optional[Dict[str, Any]] = None) -> pd.DataFr
             city_centres[city] = CITY_CENTRES[city]
 
     rows: List[Dict[str, Any]] = []
-    covered_record_keys: set[str] = set()
+    selected_source = ""
 
     for source in source_order:
         if source == "openaq":
@@ -619,21 +622,20 @@ def collect_pollution_data(config: Optional[Dict[str, Any]] = None) -> pd.DataFr
         elif source == "cpcb":
             source_rows = _fetch_pollution_from_cpcb(runtime_config, target_cities)
         elif source == "kaggle_backfill":
-            source_rows = _load_kaggle_backfill(runtime_config, target_cities, covered_record_keys)
+            source_rows = _load_kaggle_backfill(runtime_config, target_cities, set())
         else:
             LOGGER.warning("Unknown pollution source %s; skipping", source)
             continue
 
         if source_rows:
-            rows.extend(source_rows)
-            for item in source_rows:
-                record_key = _build_backfill_record_key(
-                    station_name=str(item.get("station_name", "Unknown Station")),
-                    timestamp_value=item.get("timestamp", ""),
-                )
-                if record_key:
-                    covered_record_keys.add(record_key)
-            LOGGER.info("Source %s contributed %s rows (total %s)", source, len(source_rows), len(rows))
+            rows = source_rows
+            selected_source = source
+            LOGGER.info(
+                "Selected source '%s' with %s rows; skipping lower-priority sources",
+                source,
+                len(source_rows),
+            )
+            break
 
     if not rows:
         if _synthetic_allowed():
@@ -657,13 +659,19 @@ def collect_pollution_data(config: Optional[Dict[str, Any]] = None) -> pd.DataFr
         factories_df=factories,
         threshold_km=float(runtime_config["validation"]["haversine_threshold_km"]),
     )
+    raw_df = pollution_df.copy()
     pollution_df = validate_pollution_ranges(pollution_df, runtime_config["validation"])
     pollution_df = impute_pollution_missing_values(pollution_df)
 
     raw_path = get_project_root() / runtime_config["paths"]["pollution_raw"]
     raw_path.parent.mkdir(parents=True, exist_ok=True)
-    pollution_df.to_csv(raw_path, index=False)
-    LOGGER.info("Raw pollution dataset written to %s with %s rows", raw_path, len(pollution_df))
+    raw_df.to_csv(raw_path, index=False)
+    LOGGER.info(
+        "Raw pollution dataset written to %s with %s rows (source=%s)",
+        raw_path,
+        len(raw_df),
+        selected_source or "unknown",
+    )
 
     processed_path = get_project_root() / runtime_config["paths"]["pollution_processed"]
     processed_path.parent.mkdir(parents=True, exist_ok=True)
