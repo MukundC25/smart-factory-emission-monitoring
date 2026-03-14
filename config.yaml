@@ -5,6 +5,7 @@ project:
 paths:
   factories_raw: data/raw/factories/factories.csv
   pollution_raw: data/raw/pollution/pollution_readings.csv
+  pollution_processed: data/processed/pollution_clean.csv
   processed_dataset: data/processed/ml_dataset.parquet
   recommendations: data/output/recommendations.csv
   dashboard: data/output/dashboard.html
@@ -12,27 +13,49 @@ paths:
   scaler: models/scaler.pkl
   model_report: models/model_report.json
   log_file: data/output/pipeline.log
+  # Place a curated Kaggle CSV here to activate offline backfill
+  kaggle_backfill: data/raw/pollution/kaggle_backfill.csv
 
 ingestion:
-  timeout_seconds: 20
+  timeout_seconds: 15
   max_retries: 2
-  backoff_base_seconds: 1.5
+  backoff_base_seconds: 2.0
   rate_limit_seconds: 0.5
   min_factory_records: 50
+  # Number of days of history to collect from live APIs
+  pollution_lookback_days: 365
+  # Source priority executed in order; remove an entry to skip it
+  pollution_sources:
+    - openaq
+    - cpcb
+    - kaggle_backfill
   cities:
-    - Pune
+    - Delhi
     - Mumbai
-    - Surat
-    - Ahmedabad
+    - Pune
+    - Bengaluru
     - Chennai
     - Hyderabad
-    - Bengaluru
-    - Delhi NCR
+    - Kolkata
+    - Ahmedabad
+    - Surat
+    - Jaipur
+    - Lucknow
+    - Kanpur
+    - Patna
+    - Varanasi
+    - Nagpur
+    - Bhopal
+    - Indore
+    - Visakhapatnam
+    - Coimbatore
 
 apis:
   overpass_url: https://overpass-api.de/api/interpreter
   openaq_url: https://api.openaq.org/v3
-  cpcb_url: https://app.cpcbccr.com/ccr/#/caaqm-dashboard-all/caaqm-landing
+  # data.gov.in CPCB air-quality resource ID (public; no auth needed for listed resources)
+  datagov_base_url: https://api.data.gov.in/resource
+  datagov_cpcb_resource_id: 3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69
 
 validation:
   haversine_threshold_km: 50.0

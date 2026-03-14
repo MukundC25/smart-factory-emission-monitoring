@@ -16,14 +16,28 @@ from src.common import get_project_root, initialize_environment, safe_request_js
 LOGGER = logging.getLogger(__name__)
 
 CITY_METADATA: Dict[str, Dict[str, Any]] = {
-    "Pune": {"state": "Maharashtra", "country": "India", "lat": 18.5204, "lon": 73.8567},
+    "Delhi": {"state": "Delhi", "country": "India", "lat": 28.6139, "lon": 77.2090},
     "Mumbai": {"state": "Maharashtra", "country": "India", "lat": 19.0760, "lon": 72.8777},
-    "Surat": {"state": "Gujarat", "country": "India", "lat": 21.1702, "lon": 72.8311},
-    "Ahmedabad": {"state": "Gujarat", "country": "India", "lat": 23.0225, "lon": 72.5714},
+    "Pune": {"state": "Maharashtra", "country": "India", "lat": 18.5204, "lon": 73.8567},
+    "Bengaluru": {"state": "Karnataka", "country": "India", "lat": 12.9716, "lon": 77.5946},
     "Chennai": {"state": "Tamil Nadu", "country": "India", "lat": 13.0827, "lon": 80.2707},
     "Hyderabad": {"state": "Telangana", "country": "India", "lat": 17.3850, "lon": 78.4867},
-    "Bengaluru": {"state": "Karnataka", "country": "India", "lat": 12.9716, "lon": 77.5946},
+    "Kolkata": {"state": "West Bengal", "country": "India", "lat": 22.5726, "lon": 88.3639},
+    "Ahmedabad": {"state": "Gujarat", "country": "India", "lat": 23.0225, "lon": 72.5714},
+    "Surat": {"state": "Gujarat", "country": "India", "lat": 21.1702, "lon": 72.8311},
+    "Jaipur": {"state": "Rajasthan", "country": "India", "lat": 26.9124, "lon": 75.7873},
+    "Lucknow": {"state": "Uttar Pradesh", "country": "India", "lat": 26.8467, "lon": 80.9462},
+    "Kanpur": {"state": "Uttar Pradesh", "country": "India", "lat": 26.4499, "lon": 80.3319},
+    "Patna": {"state": "Bihar", "country": "India", "lat": 25.5941, "lon": 85.1376},
+    "Varanasi": {"state": "Uttar Pradesh", "country": "India", "lat": 25.3176, "lon": 82.9739},
+    "Nagpur": {"state": "Maharashtra", "country": "India", "lat": 21.1458, "lon": 79.0882},
+    "Bhopal": {"state": "Madhya Pradesh", "country": "India", "lat": 23.2599, "lon": 77.4126},
+    "Indore": {"state": "Madhya Pradesh", "country": "India", "lat": 22.7196, "lon": 75.8577},
+    "Visakhapatnam": {"state": "Andhra Pradesh", "country": "India", "lat": 17.6868, "lon": 83.2185},
+    "Coimbatore": {"state": "Tamil Nadu", "country": "India", "lat": 11.0168, "lon": 76.9558},
+    # legacy aliases kept for backward-compat
     "Delhi NCR": {"state": "Delhi", "country": "India", "lat": 28.6139, "lon": 77.2090},
+    "Bangalore": {"state": "Karnataka", "country": "India", "lat": 12.9716, "lon": 77.5946},
 }
 
 INDUSTRY_TYPES = [
