@@ -1,0 +1,26 @@
+{
+  "selected_model": "xgboost",
+  "metrics": {
+    "random_forest": {
+      "rmse": 0.2752819456311059,
+      "mae": 0.20470383230155215,
+      "r2": 0.9677945934248198
+    },
+    "xgboost": {
+      "rmse": 0.2570321648158747,
+      "mae": 0.20267120191538926,
+      "r2": 0.971923156835637
+    }
+  },
+  "config": {
+    "target_column": "pollution_impact_score",
+    "feature_count": 28,
+    "train_rows": 425,
+    "test_rows": 75
+  },
+  "artifacts": {
+    "model": "C:\\Users\\PRANAV KADAM\\smart-factory-emission-monitoring\\models\\pollution_impact_model.pkl",
+    "scaler": "C:\\Users\\PRANAV KADAM\\smart-factory-emission-monitoring\\models\\scaler.pkl",
+    "feature_importance_plot": "C:\\Users\\PRANAV KADAM\\smart-factory-emission-monitoring\\models\\feature_importance.png"
+  }
+}

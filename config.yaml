@@ -1,0 +1,68 @@
+project:
+  name: smart-factory-emission-monitoring
+  country: India
+
+paths:
+  factories_raw: data/raw/factories/factories.csv
+  pollution_raw: data/raw/pollution/pollution_readings.csv
+  processed_dataset: data/processed/ml_dataset.parquet
+  recommendations: data/output/recommendations.csv
+  dashboard: data/output/dashboard.html
+  model: models/pollution_impact_model.pkl
+  scaler: models/scaler.pkl
+  model_report: models/model_report.json
+  log_file: data/output/pipeline.log
+
+ingestion:
+  timeout_seconds: 20
+  max_retries: 2
+  backoff_base_seconds: 1.5
+  rate_limit_seconds: 0.5
+  min_factory_records: 50
+  cities:
+    - Pune
+    - Mumbai
+    - Surat
+    - Ahmedabad
+    - Chennai
+    - Hyderabad
+    - Bengaluru
+    - Delhi NCR
+
+apis:
+  overpass_url: https://overpass-api.de/api/interpreter
+  openaq_url: https://api.openaq.org/v3
+  cpcb_url: https://app.cpcbccr.com/ccr/#/caaqm-dashboard-all/caaqm-landing
+
+validation:
+  haversine_threshold_km: 50.0
+  pm25_min: 0.0
+  pm25_max: 500.0
+  pm10_min: 0.0
+  pm10_max: 600.0
+  co_min: 0.0
+  co_max: 50.0
+  no2_min: 0.0
+  no2_max: 400.0
+  so2_min: 0.0
+  so2_max: 400.0
+  o3_min: 0.0
+  o3_max: 300.0
+
+ml:
+  random_state: 42
+  n_estimators: 300
+  test_size: 0.15
+  val_size: 0.15
+  target_column: pollution_impact_score
+  pollution_weights:
+    pm25: 0.35
+    pm10: 0.2
+    no2: 0.15
+    so2: 0.1
+    co: 0.1
+    o3: 0.1
+
+risk_bands:
+  low_max: 3.0
+  medium_max: 6.0
