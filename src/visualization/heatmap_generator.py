@@ -26,6 +26,12 @@ def make_html_self_contained(html_path: Path) -> None:
     with inline script/style elements. Failed fetches are logged and left
     unchanged to avoid breaking output generation.
 
+    Network access:
+        Performs HTTP(S) requests at build time to fetch external assets.
+        In offline/CI/air-gapped environments, fetches may fail and HTML
+        may retain external references. Set HEATMAP_INLINE_ASSETS=0 to
+        disable all network access and asset inlining entirely.
+
     Args:
         html_path: Path to generated HTML file.
     """
@@ -43,45 +49,57 @@ def make_html_self_contained(html_path: Path) -> None:
 
     text = html_path.read_text(encoding="utf-8")
     soup = BeautifulSoup(text, "html.parser")
-    session = requests.Session()
+    inlined_count = 0
+    network_error_occurred = False
     timeout_seconds = 20
 
-    for script_tag in list(soup.find_all("script", src=True)):
-        if time.monotonic() - start_time > total_timeout_seconds:
-            LOGGER.warning("Stopping script inlining — total timeout reached")
-            break
-        src = script_tag.get("src", "")
-        if not isinstance(src, str) or not src.startswith(("http://", "https://")):
-            continue
-        try:
-            response = session.get(src, timeout=timeout_seconds)
-            response.raise_for_status()
-            inline_tag = soup.new_tag("script")
-            inline_tag.string = response.text
-            script_tag.replace_with(inline_tag)
-            LOGGER.info("Inlined script asset: %s", src)
-        except Exception as exc:
-            LOGGER.warning("Could not inline script asset %s: %s", src, exc)
+    with requests.Session() as session:
+        for script_tag in list(soup.find_all("script", src=True)):
+            if time.monotonic() - start_time > total_timeout_seconds:
+                LOGGER.warning("Stopping script inlining — total timeout reached")
+                break
+            src = script_tag.get("src", "")
+            if not isinstance(src, str) or not src.startswith(("http://", "https://")):
+                continue
+            try:
+                response = session.get(src, timeout=timeout_seconds)
+                response.raise_for_status()
+                inline_tag = soup.new_tag("script")
+                inline_tag.string = response.text
+                script_tag.replace_with(inline_tag)
+                inlined_count += 1
+                LOGGER.info("Inlined script asset: %s", src)
+            except Exception as exc:
+                network_error_occurred = True
+                LOGGER.warning("Could not inline script asset %s: %s", src, exc)
 
-    for link_tag in list(soup.find_all("link", href=True)):
-        if time.monotonic() - start_time > total_timeout_seconds:
-            LOGGER.warning("Stopping stylesheet inlining — total timeout reached")
-            break
-        rel_values = link_tag.get("rel") or []
-        href = link_tag.get("href", "")
-        if "stylesheet" not in rel_values:
-            continue
-        if not isinstance(href, str) or not href.startswith(("http://", "https://")):
-            continue
-        try:
-            response = session.get(href, timeout=timeout_seconds)
-            response.raise_for_status()
-            style_tag = soup.new_tag("style")
-            style_tag.string = response.text
-            link_tag.replace_with(style_tag)
-            LOGGER.info("Inlined stylesheet asset: %s", href)
-        except Exception as exc:
-            LOGGER.warning("Could not inline stylesheet asset %s: %s", href, exc)
+        for link_tag in list(soup.find_all("link", href=True)):
+            if time.monotonic() - start_time > total_timeout_seconds:
+                LOGGER.warning("Stopping stylesheet inlining — total timeout reached")
+                break
+            rel_values = link_tag.get("rel") or []
+            href = link_tag.get("href", "")
+            if "stylesheet" not in rel_values:
+                continue
+            if not isinstance(href, str) or not href.startswith(("http://", "https://")):
+                continue
+            try:
+                response = session.get(href, timeout=timeout_seconds)
+                response.raise_for_status()
+                style_tag = soup.new_tag("style")
+                style_tag.string = response.text
+                link_tag.replace_with(style_tag)
+                inlined_count += 1
+                LOGGER.info("Inlined stylesheet asset: %s", href)
+            except Exception as exc:
+                network_error_occurred = True
+                LOGGER.warning("Could not inline stylesheet asset %s: %s", href, exc)
+
+    if network_error_occurred and inlined_count == 0:
+        LOGGER.warning(
+            "All asset inlining attempts failed. HTML may reference external "
+            "JS/CSS. In offline environments set HEATMAP_INLINE_ASSETS=0."
+        )
 
     html_path.write_text(str(soup), encoding="utf-8")
 
@@ -180,8 +198,9 @@ class HeatmapGenerator:
         station_layer = folium.FeatureGroup(name="Pollution Stations", show=True)
         lat_col = "station_lat" if "station_lat" in df.columns else "latitude"
         lon_col = "station_lon" if "station_lon" in df.columns else "longitude"
+        unique_df = df.drop_duplicates(subset=[lat_col, lon_col])
 
-        for _, row in df.iterrows():
+        for _, row in unique_df.iterrows():
             lat = pd.to_numeric(row.get(lat_col), errors="coerce")
             lon = pd.to_numeric(row.get(lon_col), errors="coerce")
             if pd.isna(lat) or pd.isna(lon):
