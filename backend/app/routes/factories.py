@@ -5,15 +5,15 @@ import json
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
-import pandas as pd
+from sqlalchemy.orm import Session
 
 from ..schemas import (
     Factory,
     PollutionImpactPredictionRequest,
     PollutionImpactPredictionResponse,
 )
-from ..services.ml_service import get_ml_service
+from ..database.db import get_db
+from ..database.models import Factory, Recommendation
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/factories", tags=["Factories"])
@@ -214,6 +214,73 @@ def predict_pollution_impact(request: PollutionImpactPredictionRequest):
     except Exception as e:
         logger.error("Prediction error: %s", e)
         raise HTTPException(status_code=500, detail="Prediction failed")
+
+
+@router.post("/store", response_model=dict)
+def store_factory(factory: Factory, db: Session = Depends(get_db)):
+    """Store a new factory in the database.
+
+    Args:
+        factory: Factory data.
+
+    Returns:
+        dict: Success message.
+    """
+    try:
+        db_factory = Factory(
+            factory_id=factory.factory_id,
+            factory_name=factory.factory_name,
+            industry_type=factory.industry_type,
+            latitude=factory.latitude,
+            longitude=factory.longitude,
+            city=factory.city,
+            state=factory.state,
+            country=factory.country,
+        )
+        db.add(db_factory)
+        db.commit()
+        db.refresh(db_factory)
+        return {"message": "Factory stored successfully", "id": db_factory.id}
+    except Exception as e:
+        db.rollback()
+        logger.error("Error storing factory: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to store factory")
+
+
+@router.post("/store-recommendation", response_model=dict)
+def store_recommendation(
+    factory_id: str,
+    risk_level: str,
+    recommendation_text: str,
+    predicted_score: float,
+    db: Session = Depends(get_db)
+):
+    """Store a new recommendation in the database.
+
+    Args:
+        factory_id: Factory ID.
+        risk_level: Risk level.
+        recommendation_text: Recommendation text.
+        predicted_score: Predicted score.
+
+    Returns:
+        dict: Success message.
+    """
+    try:
+        db_rec = Recommendation(
+            factory_id=factory_id,
+            risk_level=risk_level,
+            recommendation_text=recommendation_text,
+            predicted_score=predicted_score,
+        )
+        db.add(db_rec)
+        db.commit()
+        db.refresh(db_rec)
+        return {"message": "Recommendation stored successfully", "id": db_rec.id}
+    except Exception as e:
+        db.rollback()
+        logger.error("Error storing recommendation: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to store recommendation")
 
 
 @router.get("/batch/predict-all", response_model=List[PollutionImpactPredictionResponse])

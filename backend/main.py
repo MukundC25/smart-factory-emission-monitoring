@@ -21,8 +21,11 @@ from fastapi.responses import JSONResponse
 from backend.config import get_settings
 from backend.dependencies import get_data_loader
 from backend.utils.data_loader import DataLoader
-from backend.routers.factories import router as factories_router
-from backend.routers.pollution import router as pollution_router
+from backend.app.database.db import engine, Base
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+logger.info("Database tables created or verified.")
 
 settings = get_settings()
 
