@@ -107,13 +107,13 @@ function useFactoryData(city) {
       setLoading(true)
       try {
         const query = new URLSearchParams({ city, limit: '350' })
-        const response = await fetch(`${API_BASE_URL}/factories/?${query}`)
+        const response = await fetch(`${API_BASE_URL}/factories?${query}`)
         if (!response.ok) {
           throw new Error('Factory fetch failed')
         }
         const payload = await response.json()
         if (!active) return
-        const items = (payload.items || []).map((item, index) => {
+        const items = (payload.data || []).map((item, index) => {
           const score = normalizeScore(item.pollution_score)
           return {
             ...item,
@@ -594,7 +594,25 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
   const mapRef = useRef(null)
   const mapContainerRef = useRef(null)
   const markersRef = useRef([])
+  const heatmapLayerRef = useRef(null)
   const { goBack, goNext, canGoBack } = useFlowNavigation()
+  const [heatmapData, setHeatmapData] = useState([])
+
+  // Fetch heatmap data
+  useEffect(() => {
+    async function fetchHeatmap() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/pollution/heatmap/data?city=${city}&parameter=aqi_index&limit=2000`)
+        if (response.ok) {
+          const data = await response.json()
+          setHeatmapData(data.points || [])
+        }
+      } catch (err) {
+        console.error('Heatmap fetch failed:', err)
+      }
+    }
+    if (city) fetchHeatmap()
+  }, [city])
 
   const selectedFactory = useMemo(
     () => factories.find((item) => item.factory_id === selectedFactoryId) || factories[0],
@@ -617,6 +635,40 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
     })
     map.addControl(new mapboxgl.NavigationControl(), 'top-right')
     mapRef.current = map
+
+    // Add heatmap source and layer when map loads
+    map.on('load', () => {
+      map.addSource('pollution-heatmap', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      })
+
+      map.addLayer({
+        id: 'heatmap-layer',
+        type: 'heatmap',
+        source: 'pollution-heatmap',
+        paint: {
+          'heatmap-weight': ['get', 'intensity'],
+          'heatmap-intensity': 1,
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'rgba(0, 255, 0, 0)',
+            0.2, 'rgba(255, 255, 0, 0.5)',
+            0.5, 'rgba(255, 165, 0, 0.6)',
+            1, 'rgba(255, 0, 0, 0.8)'
+          ],
+          'heatmap-radius': 30,
+          'heatmap-opacity': 0.6
+        }
+      })
+
+      heatmapLayerRef.current = map.getLayer('heatmap-layer')
+    })
 
     return () => {
       markersRef.current.forEach((marker) => marker.remove())
@@ -664,14 +716,34 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
     })
   }, [factories, setSelectedFactoryId])
 
+  // Update heatmap data when it changes
   useEffect(() => {
-    if (!mapRef.current || !selectedFactory) return
-    mapRef.current.flyTo({
-      center: [selectedFactory.longitude, selectedFactory.latitude],
-      zoom: 12,
-      duration: 900,
-    })
-  }, [selectedFactory])
+    const map = mapRef.current
+    if (!map || !heatmapData.length) return
+
+    const features = heatmapData.map(([lat, lon, intensity]) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: [lon, lat]
+      },
+      properties: { intensity: Math.min(intensity / 100, 1) }
+    }))
+
+    const source = map.getSource('pollution-heatmap')
+    if (source) {
+      source.setData({
+        type: 'FeatureCollection',
+        features
+      })
+    }
+  }, [heatmapData])
+
+  const handleViewDetails = () => {
+    if (selectedFactoryId) {
+      goNext()
+    }
+  }
 
   return (
     <div className="floating-content" style={{ maxWidth: '900px' }}>
@@ -681,8 +753,33 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
       
       {loading && <p style={{ color: '#718096', marginBottom: '1rem' }}>Loading factories...</p>}
       
+      {!loading && factories.length > 0 && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
+          <div style={{ fontSize: '0.875rem', color: '#4A5568' }}>
+            Selected: <strong>{selectedFactory?.factory_name || 'None'}</strong>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '0.25rem' }}>
+            {selectedFactory?.industry_type} • Risk: {selectedFactory?.risk_level || 'N/A'}
+          </div>
+        </div>
+      )}
+      
       <div className="map-wrapper">
         <div ref={mapContainerRef} className="map-container" />
+      </div>
+      
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
+        <button 
+          className="cta-button" 
+          onClick={handleViewDetails}
+          disabled={!selectedFactoryId}
+          style={{ opacity: selectedFactoryId ? 1 : 0.5 }}
+        >
+          View Factory Details
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
       
       <NavArrows onBack={goBack} onNext={goNext} canGoBack={canGoBack} />
