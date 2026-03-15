@@ -78,11 +78,12 @@ def get_factories(
 
     df = factories_df.copy()
 
-    # Merge risk_level from recommendations when needed for filter or response
-    if not recommendations_df.empty and "risk_level" in recommendations_df.columns:
-        rec_cols = [c for c in ["factory_id", "risk_level"] if c in recommendations_df.columns]
-        rec_subset = recommendations_df[rec_cols].drop_duplicates("factory_id")
-        df = df.merge(rec_subset, on="factory_id", how="left", suffixes=("", "_rec"))
+    # Merge pollution data from recommendations when needed for filter or response
+    if not recommendations_df.empty:
+        rec_cols = [c for c in ["factory_id", "risk_level", "composite_score", "latest_pm25", "latest_pm10", "dominant_pollutant", "immediate_actions"] if c in recommendations_df.columns]
+        if rec_cols:
+            rec_subset = recommendations_df[rec_cols].drop_duplicates("factory_id")
+            df = df.merge(rec_subset, on="factory_id", how="left", suffixes=("", "_rec"))
 
     # Apply filters
     if city:
@@ -114,7 +115,37 @@ def get_factories(
     total = len(df)
     offset = (page - 1) * page_size
     page_df = df.iloc[offset : offset + page_size]
-    data = [_row_to_factory_base(row) for _, row in page_df.iterrows()]
+    
+    def _row_to_factory_detail(row: pd.Series) -> FactoryDetail:
+        """Convert DataFrame row to FactoryDetail with pollution data."""
+        def _str_or_none(key: str) -> Optional[str]:
+            v = row.get(key)
+            return str(v) if v is not None and pd.notna(v) else None
+        
+        def _float_or_none(key: str) -> Optional[float]:
+            v = row.get(key)
+            return float(v) if v is not None and pd.notna(v) else None
+        
+        def _recs_or_none(key: str) -> Optional[List[str]]:
+            v = row.get(key)
+            return [str(v)] if v is not None and pd.notna(v) else None
+        
+        return FactoryDetail(
+            factory_id=str(row.get("factory_id", "")),
+            factory_name=str(row.get("factory_name", "")),
+            industry_type=str(row.get("industry_type", "")),
+            latitude=float(row.get("latitude", 0.0)),
+            longitude=float(row.get("longitude", 0.0)),
+            city=str(row.get("city", "")),
+            state=_str_or_none("state"),
+            country=_str_or_none("country"),
+            source=_str_or_none("source"),
+            pollution_impact_score=_float_or_none("composite_score"),
+            risk_level=_str_or_none("risk_level"),
+            recommendations=_recs_or_none("immediate_actions"),
+        )
+    
+    data = [_row_to_factory_detail(row) for _, row in page_df.iterrows()]
     return FactoryListResponse(total=total, page=page, page_size=page_size, data=data)
 
 
