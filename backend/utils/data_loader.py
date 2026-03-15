@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
+import yaml
 
 from backend.config import Settings, get_settings
 
@@ -99,6 +101,7 @@ class DataLoader:
         self._factories: Optional[pd.DataFrame] = None
         self._pollution: Optional[pd.DataFrame] = None
         self._recommendations: Optional[pd.DataFrame] = None
+        self._recommendation_reports: Optional[List[Dict[str, Any]]] = None
         self._loaded_at: float = 0.0
 
     # ------------------------------------------------------------------
@@ -175,7 +178,57 @@ class DataLoader:
         self._recommendations = self._load_file(
             self._settings.RECOMMENDATIONS_CSV, _RECOMMENDATIONS_SCHEMA, "recommendations"
         )
+        self._recommendation_reports = self._load_recommendation_reports()
         self._loaded_at = time.monotonic()
+
+    def _resolve_recommendations_json_path(self) -> Path:
+        """Resolve recommendations JSON path from config.yaml.
+
+        Returns:
+            Path: Absolute recommendations JSON path.
+        """
+        config_path = Path(__file__).resolve().parent.parent.parent / "config.yaml"
+        with config_path.open("r", encoding="utf-8") as file:
+            config = yaml.safe_load(file) or {}
+
+        recommendations_cfg = config.get("recommendations", {})
+        path_cfg = config.get("paths", {})
+
+        output_json = recommendations_cfg.get("output_json")
+        if output_json:
+            return Path(__file__).resolve().parent.parent.parent / str(output_json)
+
+        recommendations_csv = path_cfg.get("recommendations")
+        if recommendations_csv:
+            return (Path(__file__).resolve().parent.parent.parent / str(recommendations_csv)).with_suffix(".json")
+        return self._settings.RECOMMENDATIONS_CSV.with_suffix(".json")
+
+    def _load_recommendation_reports(self) -> List[Dict[str, Any]]:
+        """Load full recommendation reports from JSON output.
+
+        Returns:
+            List[Dict[str, Any]]: Report dictionaries.
+        """
+        path = self._resolve_recommendations_json_path()
+        if not path.exists():
+            logger.warning("recommendations_json file not found at %s — returning empty list", path)
+            return []
+
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            reports = payload.get("reports", [])
+            if isinstance(reports, list):
+                logger.info("Loaded recommendations_json: %d reports from %s", len(reports), path)
+                return reports
+            logger.warning("recommendations_json payload malformed at %s — returning empty list", path)
+            return []
+        except Exception as exc:
+            logger.exception(
+                "Failed to load recommendations_json from %s — returning empty list: %s",
+                path,
+                exc,
+            )
+            return []
 
     # ------------------------------------------------------------------
     # Public API
@@ -210,6 +263,16 @@ class DataLoader:
         if self._recommendations is None or self._is_stale():
             self._load_all()
         return self._recommendations.copy()  # type: ignore[return-value]
+
+    def load_recommendation_reports(self) -> List[Dict[str, Any]]:
+        """Return recommendations JSON reports, reloading from disk if stale.
+
+        Returns:
+            List[Dict[str, Any]]: Full recommendation reports.
+        """
+        if self._recommendation_reports is None or self._is_stale():
+            self._load_all()
+        return list(self._recommendation_reports or [])
 
     def refresh(self) -> None:
         """Force reload all datasets from disk, ignoring cache TTL."""
