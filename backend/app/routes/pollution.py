@@ -4,10 +4,13 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
+from sqlalchemy.orm import Session
 import pandas as pd
 
 from ..schemas import PollutionReading
+from ..database.db import get_db
+from ..database.models import PollutionReading as DBPollutionReading
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pollution", tags=["Pollution"])
@@ -202,3 +205,55 @@ def get_pollution_stations():
     except Exception as e:
         logger.error("Error fetching stations: %s", e)
         raise HTTPException(status_code=500, detail="Failed to retrieve stations")
+
+
+@router.post("/store", response_model=dict)
+def store_pollution_reading(reading: PollutionReading, db: Session = Depends(get_db)):
+    """Store a new pollution reading in the database.
+
+    Args:
+        reading: Pollution reading data.
+
+    Returns:
+        dict: Success message.
+    """
+    from datetime import datetime
+
+    if not isinstance(reading.timestamp, str) or not reading.timestamp.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Timestamp is required and must be a non-empty ISO 8601 string",
+        )
+    try:
+        parsed_timestamp = datetime.fromisoformat(
+            reading.timestamp.replace("Z", "+00:00")
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail="Timestamp must be a valid ISO 8601 datetime string",
+        )
+    try:
+        db_reading = DBPollutionReading(
+            station_name=reading.station_name,
+            station_lat=reading.station_lat,
+            station_lon=reading.station_lon,
+            city=reading.city,
+            timestamp=parsed_timestamp,
+            pm25=reading.pm25,
+            pm10=reading.pm10,
+            co=reading.co,
+            no2=reading.no2,
+            so2=reading.so2,
+            o3=reading.o3,
+            aqi_index=reading.aqi_index,
+            source="api",
+        )
+        db.add(db_reading)
+        db.commit()
+        db.refresh(db_reading)
+        return {"message": "Pollution reading stored successfully", "id": db_reading.id}
+    except Exception as e:
+        db.rollback()
+        logger.error("Error storing pollution reading: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to store pollution reading")
