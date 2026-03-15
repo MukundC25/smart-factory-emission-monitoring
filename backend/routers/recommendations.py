@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -120,8 +121,19 @@ def recommendations_stats(loader: DataLoader = Depends(get_data_loader)) -> Reco
         for pollutant, count in pollutant_counter.most_common(5)
     ]
 
-    generated_values = [item.get("generated_at") for item in reports if item.get("generated_at")]
-    last_generated = max(generated_values) if generated_values else None
+    parsed_generated_values = []
+    for item in reports:
+        value = item.get("generated_at")
+        if not value:
+            continue
+        if isinstance(value, datetime):
+            parsed_generated_values.append(value)
+        elif isinstance(value, str):
+            try:
+                parsed_generated_values.append(datetime.fromisoformat(value))
+            except (ValueError, TypeError):
+                continue
+    last_generated = max(parsed_generated_values) if parsed_generated_values else None
 
     return RecommendationsStatsResponse(
         total_factories=len(reports),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -14,6 +15,31 @@ import yaml
 from backend.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
+
+_CONFIG_CACHE: Optional[Dict[str, Any]] = None
+_CONFIG_PATH: Optional[Path] = None
+
+
+def _get_config() -> Dict[str, Any]:
+    global _CONFIG_CACHE, _CONFIG_PATH
+    if _CONFIG_CACHE is not None:
+        return _CONFIG_CACHE
+
+    env_path = os.getenv("APP_CONFIG_PATH")
+    config_path = Path(env_path) if env_path else Path(__file__).resolve().parent.parent.parent / "config.yaml"
+    _CONFIG_PATH = config_path
+
+    try:
+        with config_path.open("r", encoding="utf-8") as file:
+            _CONFIG_CACHE = yaml.safe_load(file) or {}
+    except FileNotFoundError:
+        logger.warning("Config not found at %s — using empty config", config_path)
+        _CONFIG_CACHE = {}
+    except Exception as exc:
+        logger.exception("Failed to load config: %s", exc)
+        _CONFIG_CACHE = {}
+
+    return _CONFIG_CACHE
 
 # ---------------------------------------------------------------------------
 # Canonical empty schemas — every column that downstream code may reference.
@@ -187,20 +213,16 @@ class DataLoader:
         Returns:
             Path: Absolute recommendations JSON path.
         """
-        config_path = Path(__file__).resolve().parent.parent.parent / "config.yaml"
-        with config_path.open("r", encoding="utf-8") as file:
-            config = yaml.safe_load(file) or {}
+        config = _get_config()
+        base_dir = _CONFIG_PATH.parent if _CONFIG_PATH else Path.cwd()
 
-        recommendations_cfg = config.get("recommendations", {})
-        path_cfg = config.get("paths", {})
-
-        output_json = recommendations_cfg.get("output_json")
+        output_json = config.get("recommendations", {}).get("output_json")
         if output_json:
-            return Path(__file__).resolve().parent.parent.parent / str(output_json)
+            return (base_dir / str(output_json)).resolve()
 
-        recommendations_csv = path_cfg.get("recommendations")
+        recommendations_csv = config.get("paths", {}).get("recommendations")
         if recommendations_csv:
-            return (Path(__file__).resolve().parent.parent.parent / str(recommendations_csv)).with_suffix(".json")
+            return (base_dir / str(recommendations_csv)).with_suffix(".json").resolve()
         return self._settings.RECOMMENDATIONS_CSV.with_suffix(".json")
 
     def _load_recommendation_reports(self) -> List[Dict[str, Any]]:

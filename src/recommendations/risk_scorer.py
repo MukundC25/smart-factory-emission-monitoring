@@ -86,7 +86,9 @@ class PollutionRiskScorer:
                 total_weight += meta["weight"]
         composite_score = composite / total_weight if total_weight > 0 else np.nan
         # Risk level
-        if composite_score < 3:
+        if pd.isna(composite_score):
+            risk_level = "Unknown"
+        elif composite_score < 3:
             risk_level = "Low"
         elif composite_score < 6:
             risk_level = "Medium"
@@ -95,10 +97,12 @@ class PollutionRiskScorer:
         else:
             risk_level = "Critical"
         # Dominant pollutant
-        dom_pollutant = max(
-            ((p, scores.get(f"{p}_score", -1)) for p in self.risk_weights),
-            key=lambda x: x[1] if not pd.isna(x[1]) else -1
-        )[0]
+        valid_scores = [
+            (p, scores.get(f"{p}_score"))
+            for p in self.risk_weights
+            if not pd.isna(scores.get(f"{p}_score", np.nan))
+        ]
+        dom_pollutant = max(valid_scores, key=lambda x: x[1])[0] if valid_scores else "Unknown"
         return {
             "factory_id": factory_row.get("factory_id"),
             "factory_name": factory_row.get("factory_name"),

@@ -203,6 +203,7 @@ def root() -> dict:
     return {
         "name": "Smart Factory Emission Monitoring API",
         "version": "2.0.0",
+        "description": "Recommendations endpoints: /recommendations, /recommendations/stats, /recommendations/{factory_id}, /recommendations/generate",
         "endpoints": [
             "GET /factories            — paginated factory list with filters",
             "GET /factory/{id}         — factory detail with risk score & recommendations",

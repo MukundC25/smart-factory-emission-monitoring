@@ -63,14 +63,19 @@ class MLRecommender:
         """Train the ML recommender, using real or synthetic data as needed."""
         # Load processed dataset
         dataset_path = Path(self.config.get("paths", {}).get("processed_dataset", "data/processed/ml_dataset.parquet"))
-        if dataset_path.suffix == ".parquet":
-            df = pd.read_parquet(dataset_path)
+        if dataset_path.exists():
+            if dataset_path.suffix == ".parquet":
+                df = pd.read_parquet(dataset_path)
+            else:
+                df = pd.read_csv(dataset_path)
         else:
-            df = pd.read_csv(dataset_path)
+            LOGGER.warning("Processed dataset not found at %s. Generating synthetic training data.", dataset_path)
+            df = pd.DataFrame()
         # Features
         features = ["pm25_score", "pm10_score", "so2_score", "no2_score", "co_score", "industry_type", "composite_score"]
         # Target: recommendation_category (multi-label, pipe-separated)
-        if "recommendation_category" not in df.columns or len(df) < 100:
+        missing_features = [feature for feature in features if feature not in df.columns]
+        if "recommendation_category" not in df.columns or len(df) < 100 or missing_features:
             LOGGER.warning("Insufficient real data (<100 samples) or missing target. Generating synthetic training data.")
             df = self.generate_synthetic_training_data(n_samples=200)
         X = df[features].copy()
@@ -100,6 +105,10 @@ class MLRecommender:
         self.model = model
         self.label_binarizer = mlb
         self.industry_encoder = industry_encoder
+
+    def train(self) -> None:
+        """Backward-compatible train entrypoint for tests and callers."""
+        self.train_model()
 
     def generate_synthetic_training_data(self, n_samples: int = 200) -> pd.DataFrame:
         """Generate synthetic training data for ML recommender.
@@ -173,8 +182,21 @@ class MLRecommender:
         # Predict probabilities
         probs = self.model.predict_proba(X)
         cats = []
+        model_classes = getattr(self.model, "classes_", None)
         for idx, class_proba in enumerate(probs):
-            positive_prob = float(class_proba[0][1]) if class_proba.shape[1] > 1 else float(class_proba[0][0])
+            if isinstance(model_classes, list):
+                output_classes = np.asarray(model_classes[idx])
+            else:
+                output_classes = np.asarray(model_classes) if model_classes is not None else None
+            if output_classes is None:
+                continue
+            if output_classes.shape[0] == 1:
+                positive_prob = float(class_proba[0][0]) if int(output_classes[0]) == 1 else 0.0
+            else:
+                positive_indices = np.where(output_classes == 1)[0]
+                if positive_indices.size == 0:
+                    continue
+                positive_prob = float(class_proba[0][int(positive_indices[0])])
             if positive_prob > self.confidence_threshold:
                 cats.append(str(self.label_binarizer.classes_[idx]))
         return cats

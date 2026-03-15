@@ -5,9 +5,13 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 import pandas as pd
 import pytest
+from unittest.mock import patch
+import numpy as np
+from typing import Generator
 
 from backend.dependencies import get_data_loader
 from backend.main import app
+from src.recommendations.ml_recommender import MLRecommender
 
 
 class MockRecommendationsLoader:
@@ -67,7 +71,7 @@ class MockRecommendationsLoader:
 
 
 @pytest.fixture()
-def recommendations_client() -> TestClient:
+def recommendations_client() -> Generator[TestClient, None, None]:
     """TestClient with recommendation-aware mock loader injected."""
     app.dependency_overrides[get_data_loader] = lambda: MockRecommendationsLoader()
     with TestClient(app, raise_server_exceptions=False) as client:
@@ -102,3 +106,40 @@ def test_api_recommendations_stats(recommendations_client: TestClient) -> None:
     assert "total_factories" in body
     assert "by_risk_level" in body
     assert "top_pollutants" in body
+
+
+def test_ml_recommender_single_class_output_does_not_crash() -> None:
+    recommender = MLRecommender({})
+    recommender.train()
+
+    with patch.object(recommender.model, "predict_proba", return_value=[np.array([[1.0]])]), \
+         patch.object(recommender.model, "classes_", [np.array([0])]):
+        risk_scores = {
+            "pm25_score": 9.0,
+            "pm10_score": 8.0,
+            "so2_score": 7.0,
+            "no2_score": 6.0,
+            "co_score": 5.0,
+            "o3_score": 4.0,
+            "industry_type": "steel",
+            "composite_score": 7.5,
+        }
+        result = recommender.predict_recommendations(risk_scores)
+    assert isinstance(result, list)
+
+
+def test_ml_recommender_unknown_industry_type_does_not_crash() -> None:
+    recommender = MLRecommender({})
+    recommender.train()
+    risk_scores = {
+        "pm25_score": 5.0,
+        "pm10_score": 5.0,
+        "so2_score": 5.0,
+        "no2_score": 5.0,
+        "co_score": 5.0,
+        "o3_score": 5.0,
+        "industry_type": "unknown_xyz",
+        "composite_score": 5.0,
+    }
+    result = recommender.predict_recommendations(risk_scores)
+    assert isinstance(result, list)

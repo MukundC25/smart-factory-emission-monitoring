@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from src.recommendations.risk_scorer import PollutionRiskScorer
@@ -63,3 +64,41 @@ def test_compute_factory_risk_returns_all_fields() -> None:
     assert expected_keys.issubset(set(result.keys()))
     assert result["factory_id"] == "F001"
     assert result["factory_name"] == "Test Steel Works"
+
+
+def test_compute_factory_risk_all_nan_returns_unknown() -> None:
+    scorer = PollutionRiskScorer()
+    factory = {
+        "factory_id": "f1",
+        "factory_name": "Test",
+        "industry_type": "steel",
+        "city": "Mumbai",
+        "latitude": 19.0,
+        "longitude": 72.8,
+    }
+    pollution = {
+        "pm25": np.nan,
+        "pm10": np.nan,
+        "so2": np.nan,
+        "no2": np.nan,
+        "co": np.nan,
+        "o3": np.nan,
+    }
+    result = scorer.compute_factory_risk(pd.Series(factory), pd.Series(pollution))
+    assert result["risk_level"] == "Unknown"
+    assert result["dominant_pollutant"] == "Unknown"
+
+
+def test_compute_factory_risk_empty_pollution_does_not_crash() -> None:
+    scorer = PollutionRiskScorer()
+    factory = {
+        "factory_id": "f1",
+        "factory_name": "Test",
+        "industry_type": "steel",
+        "city": "Mumbai",
+        "latitude": 19.0,
+        "longitude": 72.8,
+    }
+    result = scorer.compute_factory_risk(pd.Series(factory), pd.Series({}))
+    assert "risk_level" in result
+    assert result["risk_level"] == "Unknown"

@@ -173,19 +173,27 @@ class HybridRecommendationEngine:
         ml_categories = self.ml_recommender.predict_recommendations(risk_scores)
         merged = self._merge_recommendations(rule_recs, ml_categories, str(risk_scores.get("dominant_pollutant", "all")))
 
+        def _safe_float(value: Any) -> float:
+            if pd.isna(value):
+                return 0.0
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return 0.0
+
         pollution_scores = {
-            "pm25_score": float(risk_scores.get("pm25_score", 0.0) or 0.0),
-            "pm10_score": float(risk_scores.get("pm10_score", 0.0) or 0.0),
-            "so2_score": float(risk_scores.get("so2_score", 0.0) or 0.0),
-            "no2_score": float(risk_scores.get("no2_score", 0.0) or 0.0),
-            "co_score": float(risk_scores.get("co_score", 0.0) or 0.0),
-            "o3_score": float(risk_scores.get("o3_score", 0.0) or 0.0),
+            "pm25_score": _safe_float(risk_scores.get("pm25_score")),
+            "pm10_score": _safe_float(risk_scores.get("pm10_score")),
+            "so2_score": _safe_float(risk_scores.get("so2_score")),
+            "no2_score": _safe_float(risk_scores.get("no2_score")),
+            "co_score": _safe_float(risk_scores.get("co_score")),
+            "o3_score": _safe_float(risk_scores.get("o3_score")),
         }
 
         top_action = merged[0].action if merged else "No specific recommendation available"
         summary = (
             f"{risk_scores.get('factory_name', 'Factory')} is classified as {risk_scores.get('risk_level', 'Unknown')} "
-            f"risk with composite score {float(risk_scores.get('composite_score', 0.0) or 0.0):.2f}. "
+            f"risk with composite score {_safe_float(risk_scores.get('composite_score')):.2f}. "
             f"Top action: {top_action}."
         )
 
@@ -195,7 +203,7 @@ class HybridRecommendationEngine:
             industry_type=str(risk_scores.get("industry_type", "")),
             city=str(risk_scores.get("city", "")),
             risk_level=str(risk_scores.get("risk_level", "Low")),
-            composite_score=float(risk_scores.get("composite_score", 0.0) or 0.0),
+            composite_score=_safe_float(risk_scores.get("composite_score")),
             dominant_pollutant=str(risk_scores.get("dominant_pollutant", "")),
             pollution_scores=pollution_scores,
             recommendations=merged,
