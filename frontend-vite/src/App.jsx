@@ -229,16 +229,23 @@ function SmokeLoadingScreen({ onComplete, isClosing = false }) {
   const containerRef = useRef(null)
   const [animationData, setAnimationData] = useState(null)
 
-  // Load smoke/fog Lottie animation
+  // Load smoke/fog Lottie animation with timeout
   useEffect(() => {
-    // Using a smoke particle animation JSON
-    fetch('https://lottie.host/4b880c43-9676-4825-9dd9-e81456d38e4b/1Yx5k1i4yX.json')
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+    fetch('https://lottie.host/4b880c43-9676-4825-9dd9-e81456d38e4b/1Yx5k1i4yX.json', {
+      signal: controller.signal,
+    })
       .then(res => res.json())
       .then(data => setAnimationData(data))
-      .catch(() => {
-        // Fallback: use GSAP smoke effect if Lottie fails
-        console.log('Lottie load failed, using fallback')
-      })
+      .catch(() => {})
+      .finally(() => clearTimeout(timeoutId))
+
+    return () => {
+      clearTimeout(timeoutId)
+      controller.abort()
+    }
   }, [])
 
   useEffect(() => {
@@ -281,33 +288,79 @@ function SmokeLoadingScreen({ onComplete, isClosing = false }) {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 100,
-        background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+        zIndex: 1000,
+        background: 'transparent',
+        overflow: 'hidden',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        flexDirection: 'column',
       }}
     >
+      {/* Fullscreen fog SVG background - base layer */}
+      <div 
+        className="fog-bg"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: "url('/fog.svg')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.6,
+        }}
+      />
+      
+      {/* Animated fog overlay with multiple layers */}
+      <div 
+        className="fog-layer-1"
+        style={{
+          position: 'absolute',
+          inset: '-20%',
+          backgroundImage: "url('/fog.svg')",
+          backgroundSize: '150% 150%',
+          backgroundPosition: 'center',
+          opacity: 0.4,
+          animation: 'fog-drift-1 20s ease-in-out infinite',
+          filter: 'blur(10px)',
+        }}
+      />
+      
+      <div 
+        className="fog-layer-2"
+        style={{
+          position: 'absolute',
+          inset: '-10%',
+          backgroundImage: "url('/fog.svg')",
+          backgroundSize: '120% 120%',
+          backgroundPosition: 'center',
+          opacity: 0.3,
+          animation: 'fog-drift-2 25s ease-in-out infinite reverse',
+          filter: 'blur(20px)',
+        }}
+      />
+
       {animationData ? (
         <Lottie 
           animationData={animationData}
           loop={true}
-          style={{ width: 400, height: 400 }}
+          style={{ 
+            width: 300, 
+            height: 300, 
+            position: 'relative',
+            zIndex: 10,
+          }}
         />
-      ) : (
-        <div className="smoke-fallback">
-          <div className="smoke-particle" />
-          <div className="smoke-particle" />
-          <div className="smoke-particle" />
-        </div>
-      )}
+      ) : null}
+      
       <div className="loading-text" style={{ 
         color: 'white', 
         fontSize: '1.5rem', 
         fontFamily: 'Space Grotesk, sans-serif',
         marginTop: '2rem',
-        opacity: 0.9 
+        opacity: 0.9,
+        position: 'relative',
+        zIndex: 10,
+        textShadow: '0 2px 10px rgba(0,0,0,0.5)',
       }}>
         {isClosing ? 'Clearing the air...' : 'Initializing...'}
       </div>
@@ -424,8 +477,6 @@ function FogLayer({ layerIndex, isClean }) {
 function EnvironmentalEffects({ isClean }) {
   return (
     <div className={`effects-layer ${isClean ? 'clean' : ''}`}>
-      {/* Fog removed - user request */}
-      
       {/* Atmospheric haze overlay */}
       <div className="haze-overlay" />
       
@@ -440,6 +491,198 @@ function EnvironmentalEffects({ isClean }) {
           <div className="blades" />
         </div>
       </div>
+    </div>
+  )
+}
+
+// ============================================
+// MOTION CLOUDS LAYER - Using Lottie
+// ============================================
+function CloudLayer({ isClean }) {
+  const [cloudData, setCloudData] = useState(null)
+
+  useEffect(() => {
+    fetch('https://lottie.host/4b880c43-9676-4825-9dd9-e81456d38e4b/1Yx5k1i4yX.json')
+      .then(res => res.json())
+      .then(data => setCloudData(data))
+      .catch(() => {})
+  }, [])
+
+  const cloudPositions = [
+    { top: '5%', left: '10%', scale: 1.2, duration: 80 },
+    { top: '12%', left: '60%', scale: 0.8, duration: 60 },
+    { top: '3%', left: '30%', scale: 1.0, duration: 70 },
+    { top: '18%', left: '75%', scale: 0.6, duration: 50 },
+    { top: '8%', left: '45%', scale: 0.9, duration: 65 },
+    { top: '22%', left: '20%', scale: 0.7, duration: 55 },
+  ]
+
+  return (
+    <div className={`clouds-layer ${isClean ? 'clean' : ''}`}>
+      {cloudData ? (
+        cloudPositions.map((pos, i) => (
+          <div
+            key={i}
+            className="cloud-lottie"
+            style={{
+              position: 'absolute',
+              top: pos.top,
+              left: pos.left,
+              width: `${200 * pos.scale}px`,
+              height: `${120 * pos.scale}px`,
+              animation: `cloud-drift-lottie ${pos.duration}s linear infinite`,
+              animationDelay: `${-i * 10}s`,
+              opacity: isClean ? 0.9 : 0.7,
+            }}
+          >
+            <Lottie
+              animationData={cloudData}
+              loop={true}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </div>
+        ))
+      ) : (
+        cloudPositions.map((pos, i) => (
+          <svg
+            key={i}
+            className="cloud-svg"
+            viewBox="0 0 200 120"
+            style={{
+              position: 'absolute',
+              top: pos.top,
+              left: '-200px',
+              width: `${180 * pos.scale}px`,
+              height: 'auto',
+              animation: `cloud-drift-svg ${pos.duration}s linear infinite`,
+              animationDelay: `${-i * 12}s`,
+              opacity: isClean ? 0.85 : 0.65,
+            }}
+          >
+            <defs>
+              <linearGradient id={`cloudGrad${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
+                <stop offset="50%" stopColor="rgba(255,255,255,0.8)" />
+                <stop offset="100%" stopColor="rgba(240,248,255,0.4)" />
+              </linearGradient>
+              <filter id={`cloudBlur${i}`}>
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
+              </filter>
+            </defs>
+            <g filter={`url(#cloudBlur${i})`}>
+              <ellipse cx="100" cy="60" rx="70" ry="35" fill={`url(#cloudGrad${i})`} />
+              <ellipse cx="60" cy="55" rx="45" ry="30" fill={`url(#cloudGrad${i})`} />
+              <ellipse cx="140" cy="55" rx="50" ry="32" fill={`url(#cloudGrad${i})`} />
+              <ellipse cx="80" cy="40" rx="35" ry="25" fill="rgba(255,255,255,0.9)" />
+              <ellipse cx="120" cy="42" rx="40" ry="28" fill="rgba(255,255,255,0.85)" />
+              <ellipse cx="45" cy="65" rx="25" ry="18" fill={`url(#cloudGrad${i})`} />
+              <ellipse cx="155" cy="62" rx="30" ry="20" fill={`url(#cloudGrad${i})`} />
+            </g>
+          </svg>
+        ))
+      )}
+    </div>
+  )
+}
+
+// ============================================
+// BIRDS LAYER - Realistic flying birds
+// ============================================
+function BirdsLayer({ isClean }) {
+  const [birdData, setBirdData] = useState(null)
+
+  useEffect(() => {
+    fetch('https://lottie.host/8f311dc5-9855-4b8f-9f8e-8f8e8f8e8f8e/8f8e8f8e.json')
+      .then(res => res.json())
+      .then(data => setBirdData(data))
+      .catch(() => {})
+  }, [])
+
+  const birdPositions = [
+    { top: '8%', duration: 25, delay: 0, scale: 0.8 },
+    { top: '15%', duration: 30, delay: 8, scale: 0.6 },
+    { top: '6%', duration: 22, delay: 15, scale: 0.7 },
+    { top: '12%', duration: 28, delay: 5, scale: 0.5 },
+    { top: '18%', duration: 35, delay: 12, scale: 0.9 },
+  ]
+
+  return (
+    <div className={`birds-layer ${isClean ? 'clean' : ''}`}>
+      {birdData ? (
+        birdPositions.map((pos, i) => (
+          <div
+            key={i}
+            className="bird-lottie"
+            style={{
+              position: 'absolute',
+              top: pos.top,
+              left: '-100px',
+              width: `${80 * pos.scale}px`,
+              height: `${60 * pos.scale}px`,
+              animation: `bird-fly ${pos.duration}s linear infinite`,
+              animationDelay: `${pos.delay}s`,
+            }}
+          >
+            <Lottie
+              animationData={birdData}
+              loop={true}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </div>
+        ))
+      ) : (
+        birdPositions.map((pos, i) => (
+          <svg
+            key={i}
+            className="bird-svg"
+            viewBox="0 0 100 60"
+            style={{
+              position: 'absolute',
+              top: pos.top,
+              left: '-80px',
+              width: `${60 * pos.scale}px`,
+              height: 'auto',
+              animation: `bird-fly ${pos.duration}s linear infinite`,
+              animationDelay: `${pos.delay}s`,
+            }}
+          >
+            <defs>
+              <linearGradient id={`birdGrad${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="rgba(60,70,80,0.9)" />
+                <stop offset="100%" stopColor="rgba(40,50,60,0.7)" />
+              </linearGradient>
+            </defs>
+            <ellipse cx="50" cy="30" rx="15" ry="6" fill={`url(#birdGrad${i})`} />
+            <path
+              d={`M 35 28 Q 20 ${18 - (i % 3) * 3} 10 20 Q 25 25 35 28`}
+              fill={`url(#birdGrad${i})`}
+              opacity="0.9"
+            >
+              <animate
+                attributeName="d"
+                values={`M 35 28 Q 20 18 10 20 Q 25 25 35 28; M 35 28 Q 20 12 8 15 Q 22 22 35 28; M 35 28 Q 20 18 10 20 Q 25 25 35 28`}
+                dur="0.8s"
+                repeatCount="indefinite"
+              />
+            </path>
+            <path
+              d={`M 65 28 Q 80 ${18 - (i % 3) * 3} 90 20 Q 75 25 65 28`}
+              fill={`url(#birdGrad${i})`}
+              opacity="0.9"
+            >
+              <animate
+                attributeName="d"
+                values={`M 65 28 Q 80 18 90 20 Q 75 25 65 28; M 65 28 Q 80 12 92 15 Q 78 22 65 28; M 65 28 Q 80 18 90 20 Q 75 25 65 28`}
+                dur="0.8s"
+                repeatCount="indefinite"
+              />
+            </path>
+            <path d="M 35 30 L 20 25 L 22 32 Z" fill={`url(#birdGrad${i})`} />
+            <circle cx="62" cy="28" r="5" fill={`url(#birdGrad${i})`} />
+            <path d="M 66 27 L 72 28 L 66 29 Z" fill="rgba(60,70,80,0.9)" />
+          </svg>
+        ))
+      )}
     </div>
   )
 }
@@ -1041,43 +1284,51 @@ function AppShell() {
         />
       )}
       
-      <SVGScene isClean={isClean} />
-      <EnvironmentalEffects isClean={isClean} />
+      {!showLoading && (
+        <>
+          <SVGScene isClean={isClean} />
+          <CloudLayer isClean={isClean} />
+          <BirdsLayer isClean={isClean} />
+          <EnvironmentalEffects isClean={isClean} />
+        </>
+      )}
       <SmokeTransition />
       
-      <div className="ui-layer">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/city" element={<CitySelector city={city} setCity={setCity} />} />
-          <Route path="/questions" element={<QuestionFlow answers={answers} setAnswers={setAnswers} />} />
-          <Route path="/analysis" element={<AnalysisLoader />} />
-          <Route
-            path="/map"
-            element={
-              <MapView
-                city={city}
-                factories={factories}
-                loading={loading}
-                selectedFactoryId={selectedFactoryId}
-                setSelectedFactoryId={setSelectedFactoryId}
-              />
-            }
-          />
-          <Route
-            path="/factory"
-            element={
-              <FactoryDetails
-                factories={factories}
-                selectedFactoryId={selectedFactoryId}
-                setSelectedFactoryId={setSelectedFactoryId}
-              />
-            }
-          />
-          <Route path="/ai-score" element={<AIScorePage factories={factories} selectedFactoryId={selectedFactoryId} />} />
-          <Route path="/solutions" element={<SolutionView factories={factories} selectedFactoryId={selectedFactoryId} />} />
-          <Route path="/transformation" element={<TransformationPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+      <div className="ui-layer" style={{ opacity: showLoading ? 0 : 1, transition: 'opacity 0.5s ease' }}>
+        {!showLoading && (
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/city" element={<CitySelector city={city} setCity={setCity} />} />
+            <Route path="/questions" element={<QuestionFlow answers={answers} setAnswers={setAnswers} />} />
+            <Route path="/analysis" element={<AnalysisLoader />} />
+            <Route
+              path="/map"
+              element={
+                <MapView
+                  city={city}
+                  factories={factories}
+                  loading={loading}
+                  selectedFactoryId={selectedFactoryId}
+                  setSelectedFactoryId={setSelectedFactoryId}
+                />
+              }
+            />
+            <Route
+              path="/factory"
+              element={
+                <FactoryDetails
+                  factories={factories}
+                  selectedFactoryId={selectedFactoryId}
+                  setSelectedFactoryId={setSelectedFactoryId}
+                />
+              }
+            />
+            <Route path="/ai-score" element={<AIScorePage factories={factories} selectedFactoryId={selectedFactoryId} />} />
+            <Route path="/solutions" element={<SolutionView factories={factories} selectedFactoryId={selectedFactoryId} />} />
+            <Route path="/transformation" element={<TransformationPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        )}
       </div>
     </>
   )

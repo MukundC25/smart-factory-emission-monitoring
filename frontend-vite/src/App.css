@@ -807,3 +807,80 @@
     font-size: 1.75rem;
   }
 }
+
+/* ============================================
+   MOTION CLOUDS & BIRDS ANIMATIONS
+   ============================================ */
+
+/* Fog drift animations */
+@keyframes fog-drift-1 {
+  0%, 100% { transform: translateX(0) scale(1); }
+  50% { transform: translateX(5%) scale(1.05); }
+}
+
+@keyframes fog-drift-2 {
+  0%, 100% { transform: translateX(0) scale(1); }
+  50% { transform: translateX(-5%) scale(1.02); }
+}
+
+/* Cloud layer styles */
+.clouds-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.cloud-lottie,
+.cloud-svg {
+  filter: drop-shadow(0 4px 10px rgba(255, 255, 255, 0.3));
+}
+
+.clouds-layer.clean .cloud-lottie,
+.clouds-layer.clean .cloud-svg {
+  opacity: 0.9;
+  filter: drop-shadow(0 4px 15px rgba(255, 255, 255, 0.5));
+}
+
+@keyframes cloud-drift-lottie {
+  0% { transform: translateX(-100vw); }
+  100% { transform: translateX(100vw); }
+}
+
+@keyframes cloud-drift-svg {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(100vw + 200px)); }
+}
+
+/* Birds layer styles */
+.birds-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bird-lottie,
+.bird-svg {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.15));
+}
+
+@keyframes bird-fly {
+  0% { 
+    transform: translateX(-200px) translateY(0);
+  }
+  25% {
+    transform: translateX(25vw) translateY(-15px);
+  }
+  50% {
+    transform: translateX(50vw) translateY(5px);
+  }
+  75% {
+    transform: translateX(75vw) translateY(-10px);
+  }
+  100% { 
+    transform: translateX(calc(100vw + 200px)) translateY(0);
+  }
+}
