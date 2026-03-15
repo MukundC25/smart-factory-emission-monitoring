@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import html
 import logging
+import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -27,6 +29,14 @@ def make_html_self_contained(html_path: Path) -> None:
     Args:
         html_path: Path to generated HTML file.
     """
+    inline_flag = os.getenv("HEATMAP_INLINE_ASSETS", "1").strip().lower()
+    if inline_flag in {"0", "false", "no", "off"}:
+        LOGGER.info("Skipping asset inlining: HEATMAP_INLINE_ASSETS=%r", inline_flag)
+        return
+
+    total_timeout_seconds = 60
+    start_time = time.monotonic()
+
     if not html_path.exists():
         LOGGER.warning("HTML file not found for inlining: %s", html_path)
         return
@@ -37,6 +47,9 @@ def make_html_self_contained(html_path: Path) -> None:
     timeout_seconds = 20
 
     for script_tag in list(soup.find_all("script", src=True)):
+        if time.monotonic() - start_time > total_timeout_seconds:
+            LOGGER.warning("Stopping script inlining — total timeout reached")
+            break
         src = script_tag.get("src", "")
         if not isinstance(src, str) or not src.startswith(("http://", "https://")):
             continue
@@ -51,6 +64,9 @@ def make_html_self_contained(html_path: Path) -> None:
             LOGGER.warning("Could not inline script asset %s: %s", src, exc)
 
     for link_tag in list(soup.find_all("link", href=True)):
+        if time.monotonic() - start_time > total_timeout_seconds:
+            LOGGER.warning("Stopping stylesheet inlining — total timeout reached")
+            break
         rel_values = link_tag.get("rel") or []
         href = link_tag.get("href", "")
         if "stylesheet" not in rel_values:
@@ -181,16 +197,21 @@ class HeatmapGenerator:
             aqi = self._safe_num(row.get("aqi_index"))
             timestamp = self._safe_text(row.get("timestamp"))
 
+            station_name_html = html.escape(station_name)
+            city_html = html.escape(city)
+            timestamp_html = html.escape(timestamp)
+            aqi_html = html.escape(aqi)
+
             popup_html = (
-                f"<b>{station_name}</b><br>"
-                f"City: {city}<br>"
+                f"<b>{station_name_html}</b><br>"
+                f"City: {city_html}<br>"
                 f"PM2.5: {pm25}<br>"
                 f"PM10: {pm10}<br>"
-                f"AQI: {aqi}<br>"
+                f"AQI: {aqi_html}<br>"
                 f"Band: {aqi_band}<br>"
-                f"Timestamp: {timestamp}"
+                f"Timestamp: {timestamp_html}"
             )
-            tooltip = f"{station_name} | AQI: {aqi}"
+            tooltip = f"{station_name_html} | AQI: {aqi_html}"
 
             folium.CircleMarker(
                 location=[float(lat), float(lon)],

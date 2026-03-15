@@ -134,7 +134,7 @@ def get_heatmap_data(
     points_df = points_df[(points_df["lon"] >= -180) & (points_df["lon"] <= 180)]
 
     if len(points_df) > limit:
-        points_df = points_df.head(limit)
+        points_df = points_df.sample(n=limit, random_state=42)  # Replace head() with sample()
 
     points = points_df[["lat", "lon", "intensity"]].astype(float).values.tolist()
     return {
