@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional
 import joblib
 import pandas as pd
 import numpy as np
+import os
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +32,66 @@ class MLService:
         self.config = {}
         self.model_path = model_path
         self.config_path = config_path
+        # Derive default paths if none were provided
+        self._resolve_default_paths()
         self._load_model()
         self._load_config()
+
+    def _resolve_default_paths(self) -> None:
+        """Resolve default model and config paths when not explicitly provided.
+        This method attempts, in order:
+        1) To read paths from a nearby config.yaml (searched upwards from this file).
+        2) To read paths from environment variables MODEL_PATH and MODEL_CONFIG_PATH.
+        If explicit paths were provided at initialization, they are not overridden.
+        """
+        # If both paths are already set, do nothing
+        if self.model_path is not None and self.config_path is not None:
+            return
+        config_file = None
+        current_path = Path(__file__).resolve()
+        # Search upwards for a config.yaml file
+        for parent in [current_path.parent] + list(current_path.parents):
+            candidate = parent / "config.yaml"
+            if candidate.exists():
+                config_file = candidate
+                break
+        model_path = self.model_path
+        config_path = self.config_path
+        if config_file is not None:
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    cfg_data = yaml.safe_load(f) or {}
+                # Prefer explicit keys if present
+                model_cfg_value = cfg_data.get("model_path")
+                config_cfg_value = (
+                    cfg_data.get("model_config_path")
+                    or cfg_data.get("model_config")
+                )
+                if model_path is None and model_cfg_value:
+                    model_path = Path(model_cfg_value)
+                    if not model_path.is_absolute():
+                        model_path = config_file.parent / model_cfg_value
+                if config_path is None and config_cfg_value:
+                    config_path = Path(config_cfg_value)
+                    if not config_path.is_absolute():
+                        config_path = config_file.parent / config_cfg_value
+            except Exception as e:
+                logger.warning(
+                    "Failed to derive default model/config paths from %s: %s",
+                    config_file,
+                    e,
+                )
+        # Fall back to environment variables if still unset
+        if model_path is None:
+            env_model = os.getenv("MODEL_PATH")
+            if env_model:
+                model_path = Path(env_model)
+        if config_path is None:
+            env_config = os.getenv("MODEL_CONFIG_PATH")
+            if env_config:
+                config_path = Path(env_config)
+        self.model_path = model_path
+        self.config_path = config_path
 
     def _load_model(self) -> None:
         """Load trained model from disk."""
@@ -81,7 +141,24 @@ class MLService:
         """
         if not self.is_ready():
             raise RuntimeError("Model not loaded. Cannot predict.")
-
+        # Align incoming features with the model's expected feature list (if available).
+        # This ensures all required columns exist (with default values) and are correctly ordered,
+        # preventing ColumnTransformer from failing on missing/misordered columns.
+        try:
+            expected_features = self.config.get("feature_list", [])
+        except Exception:
+            expected_features = []
+        if expected_features:
+            # Add any missing expected columns with a neutral default (NaN).
+            for col in expected_features:
+                if col not in features.columns:
+                    features[col] = np.nan
+            # Reorder columns to match the training-time feature order.
+            try:
+                features = features[expected_features]
+            except KeyError as e:
+                logger.error("Feature alignment failed due to missing columns: %s", e)
+                raise
         try:
             predictions = self.model.predict(features)
             # Clip predictions to valid range [0, 10]

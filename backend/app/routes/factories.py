@@ -1,6 +1,7 @@
 """Factory data and prediction endpoints."""
 
 import logging
+import json
 from pathlib import Path
 from typing import List, Optional
 
@@ -19,6 +20,32 @@ router = APIRouter(prefix="/factories", tags=["Factories"])
 
 # Cache for factory data
 _factories_cache: Optional[pd.DataFrame] = None
+
+# Path to model report containing expected feature list for predictions
+_MODEL_REPORT_PATH = Path(__file__).parent.parent.parent.parent / "models" / "model_report.json"
+
+
+def _load_model_feature_list() -> List[str]:
+    """Load the model's expected feature list from the model report JSON.
+
+    Returns:
+        List[str]: List of feature names expected by the model.
+    """
+    try:
+        if not _MODEL_REPORT_PATH.exists():
+            logger.warning("Model report JSON not found at %s", _MODEL_REPORT_PATH)
+            return []
+        with _MODEL_REPORT_PATH.open("r", encoding="utf-8") as f:
+            report = json.load(f)
+        # Common keys for feature list in model reports
+        feature_list = report.get("feature_list") or report.get("features")
+        if isinstance(feature_list, list):
+            return [str(name) for name in feature_list]
+        logger.warning("No valid feature_list found in model report at %s", _MODEL_REPORT_PATH)
+        return []
+    except Exception as exc:
+        logger.error("Failed to load model feature list from %s: %s", _MODEL_REPORT_PATH, exc)
+        return []
 
 
 def _load_factories_data(csv_path: Optional[Path] = None) -> pd.DataFrame:
@@ -155,7 +182,18 @@ def predict_pollution_impact(request: PollutionImpactPredictionRequest):
                 detail="ML model not loaded. Service unavailable.",
             )
 
+        # Start from request data
         features_dict = request.dict()
+        # Align request features with the model's expected feature list to avoid
+        # missing-column errors during prediction.
+        feature_list = _load_model_feature_list()
+        if feature_list:
+            aligned_features = {}
+            for feature_name in feature_list:
+                # Use value from request if available; otherwise set to None
+                aligned_features[feature_name] = features_dict.get(feature_name)
+            features_dict = aligned_features
+
         predicted_score = service.predict_single(features_dict)
         risk_level = service.get_risk_level(predicted_score)
 

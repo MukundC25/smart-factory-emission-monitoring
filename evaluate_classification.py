@@ -43,7 +43,11 @@ class PollutionImpactClassifier:
             self.config = json.load(f)
 
         # Risk thresholds from config
-        risk_bands = self.config.get('config', {}).get('risk_bands', {})
+        # Prefer top-level 'risk_bands' (e.g. from config.yaml), but fall back
+        # to nested 'config.risk_bands' if present, and finally to defaults.
+        risk_bands = self.config.get('risk_bands')
+        if risk_bands is None:
+            risk_bands = self.config.get('config', {}).get('risk_bands', {})
         self.low_max = risk_bands.get('low_max', 3.0)
         self.medium_max = risk_bands.get('medium_max', 6.0)
 
@@ -421,7 +425,7 @@ def main():
     results = evaluate_classification_performance(classifier, X_test, y_true_scores)
 
     # Display results
-    print(".1f")
+    print(f"Accuracy:          {results['accuracy']:.4f}")
     print(f"Macro F1-Score:    {results['macro_averages']['f1_score']:.4f}")
     print(f"Weighted F1-Score: {results['weighted_averages']['f1_score']:.4f}")
     print()
@@ -499,7 +503,7 @@ def main():
 
     print()
     print("Next Steps:")
-    print("- Start API server: cd backend && uvicorn app.main:app --reload")
+    print("- Start API server: cd backend && uvicorn backend.main:app --reload")
     print("- View dashboard: open data/output/dashboard.html")
     print("- Check model artifacts in models/ directory")
 

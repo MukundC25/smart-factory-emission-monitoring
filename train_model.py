@@ -71,6 +71,6 @@ if __name__ == "__main__":
     print("   python -m src.visualization.dashboard")
     print()
     print("3. Start the FastAPI backend:")
-    print("   cd backend && uvicorn app.main:app --reload")
+    print("   cd backend && uvicorn backend.main:app --reload")
     print()
     print("=" * 70)

@@ -328,6 +328,7 @@ def train_models(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     _save_feature_importance(best.pipeline, importance_path)
     _save_model_comparison(results, comparison_path)
 
+    project_root = get_project_root()
     report = {
         "selected_model": best.name,
         "metrics": {
@@ -350,10 +351,26 @@ def train_models(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             "total_rows": int(len(dataset)),
         },
         "artifacts": {
-            "model": str(model_path),
-            "scaler": str(scaler_path),
-            "feature_importance_plot": str(importance_path),
-            "model_comparison_plot": str(comparison_path),
+            "model": str(
+                model_path.relative_to(project_root)
+                if model_path.is_absolute()
+                else model_path
+            ),
+            "scaler": str(
+                scaler_path.relative_to(project_root)
+                if scaler_path.is_absolute()
+                else scaler_path
+            ),
+            "feature_importance_plot": str(
+                importance_path.relative_to(project_root)
+                if importance_path.is_absolute()
+                else importance_path
+            ),
+            "model_comparison_plot": str(
+                comparison_path.relative_to(project_root)
+                if comparison_path.is_absolute()
+                else comparison_path
+            ),
         },
     }
 
