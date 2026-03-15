@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 from typing import List, Optional
 
+from fastapi import APIRouter, Query, Depends, HTTPException
 from sqlalchemy.orm import Session
+import pandas as pd
 
 from ..schemas import (
     Factory,
@@ -13,7 +15,7 @@ from ..schemas import (
     PollutionImpactPredictionResponse,
 )
 from ..database.db import get_db
-from ..database.models import Factory, Recommendation
+from ..database.models import Factory as DBFactory, Recommendation
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/factories", tags=["Factories"])
@@ -227,7 +229,7 @@ def store_factory(factory: Factory, db: Session = Depends(get_db)):
         dict: Success message.
     """
     try:
-        db_factory = Factory(
+        db_factory = DBFactory(
             factory_id=factory.factory_id,
             factory_name=factory.factory_name,
             industry_type=factory.industry_type,
