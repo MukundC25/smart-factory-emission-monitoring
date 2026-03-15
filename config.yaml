@@ -110,7 +110,7 @@ recommendations:
   ml_weight: 0.3
   confidence_threshold: 0.4
   max_station_distance_km: 100
-  output_csv: data/output/recommendations.csv
+  output_csv: data/output/recommendations_reports.csv
   output_json: data/output/recommendations.json
   model_path: models/recommendation_model.pkl
   encoder_path: models/recommendation_label_encoder.pkl

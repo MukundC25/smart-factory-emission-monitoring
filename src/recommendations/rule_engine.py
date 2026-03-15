@@ -56,7 +56,7 @@ class RuleEngine:
 
         # --- Pollutant-specific rules ---
         if so2 > 6:
-            LOGGER.info("SO2 rule triggered: score=%.2f", so2)
+            LOGGER.debug("SO2 rule triggered: score=%.2f", so2)
             recs.append(Recommendation(
                 category="Emission Control",
                 priority="Immediate",
@@ -85,7 +85,7 @@ class RuleEngine:
                 timeline="1-2 months"
             ))
         if pm25 > 6 or pm10 > 6:
-            LOGGER.info("PM rule triggered: pm25=%.2f pm10=%.2f", pm25, pm10)
+            LOGGER.debug("PM rule triggered: pm25=%.2f pm10=%.2f", pm25, pm10)
             recs.append(Recommendation(
                 category="Emission Control",
                 priority="Immediate",
@@ -124,7 +124,7 @@ class RuleEngine:
                 timeline="1 month"
             ))
         if no2 > 6:
-            LOGGER.info("NO2 rule triggered: score=%.2f", no2)
+            LOGGER.debug("NO2 rule triggered: score=%.2f", no2)
             recs.append(Recommendation(
                 category="Emission Control",
                 priority="Immediate",
@@ -162,7 +162,7 @@ class RuleEngine:
                 timeline="1-2 months"
             ))
         if co > 6:
-            LOGGER.info("CO rule triggered: score=%.2f", co)
+            LOGGER.debug("CO rule triggered: score=%.2f", co)
             recs.append(Recommendation(
                 category="Process Optimization",
                 priority="Immediate",
@@ -200,7 +200,7 @@ class RuleEngine:
                 timeline="1 month"
             ))
         if o3 > 6:
-            LOGGER.info("O3 rule triggered: score=%.2f", o3)
+            LOGGER.debug("O3 rule triggered: score=%.2f", o3)
             recs.append(Recommendation(
                 category="Process Optimization",
                 priority="Immediate",
@@ -229,7 +229,7 @@ class RuleEngine:
                 timeline="1-2 months"
             ))
         if sum([pm25 > 6, pm10 > 6, so2 > 6, no2 > 6, co > 6, o3 > 6]) > 1 or composite > 6:
-            LOGGER.info("Multi-pollutant rule triggered: composite=%.2f", composite)
+            LOGGER.debug("Multi-pollutant rule triggered: composite=%.2f", composite)
             recs.append(Recommendation(
                 category="Compliance",
                 priority="Immediate",
@@ -250,7 +250,7 @@ class RuleEngine:
             ))
         # --- Risk-level rules ---
         if risk_level == "Medium":
-            LOGGER.info("Medium risk-level rule triggered")
+            LOGGER.debug("Medium risk-level rule triggered")
             recs.append(Recommendation(
                 category="Maintenance",
                 priority="Short-term",
@@ -288,7 +288,7 @@ class RuleEngine:
                 timeline="Annual"
             ))
         if risk_level == "Low":
-            LOGGER.info("Low risk-level rule triggered")
+            LOGGER.debug("Low risk-level rule triggered")
             recs.append(Recommendation(
                 category="Compliance",
                 priority="Long-term",

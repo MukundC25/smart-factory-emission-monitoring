@@ -218,6 +218,12 @@ def generate_recommendations(loader: DataLoader = Depends(get_data_loader)) -> R
     formatter.export_csv(reports)
     formatter.export_json(reports)
 
+    logger.info(
+        "Reports exported to %s (CSV) and %s (JSON) — legacy recommendations.csv untouched",
+        config.get("recommendations", {}).get("output_csv"),
+        config.get("recommendations", {}).get("output_json"),
+    )
+
     loader.refresh()
 
     output_path = str(root / _resolve_output_json_path(config))

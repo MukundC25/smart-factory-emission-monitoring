@@ -71,6 +71,18 @@ class MockRecommendationsLoader:
 
 
 @pytest.fixture()
+def trained_recommender(tmp_path) -> MLRecommender:  # type: ignore[no-untyped-def]
+    """MLRecommender trained with tmp_path model/encoder paths — no repo disk writes."""
+    config = {
+        "model_path": str(tmp_path / "recommendation_model.pkl"),
+        "encoder_path": str(tmp_path / "recommendation_label_encoder.pkl"),
+    }
+    recommender = MLRecommender(config)
+    recommender.train()
+    return recommender
+
+
+@pytest.fixture()
 def recommendations_client() -> Generator[TestClient, None, None]:
     """TestClient with recommendation-aware mock loader injected."""
     app.dependency_overrides[get_data_loader] = lambda: MockRecommendationsLoader()
@@ -108,9 +120,10 @@ def test_api_recommendations_stats(recommendations_client: TestClient) -> None:
     assert "top_pollutants" in body
 
 
-def test_ml_recommender_single_class_output_does_not_crash() -> None:
-    recommender = MLRecommender({})
-    recommender.train()
+def test_ml_recommender_single_class_output_does_not_crash(
+    trained_recommender: MLRecommender,
+) -> None:
+    recommender = trained_recommender
 
     with patch.object(recommender.model, "predict_proba", return_value=[np.array([[1.0]])]), \
          patch.object(recommender.model, "classes_", [np.array([0])]):
@@ -128,9 +141,10 @@ def test_ml_recommender_single_class_output_does_not_crash() -> None:
     assert isinstance(result, list)
 
 
-def test_ml_recommender_unknown_industry_type_does_not_crash() -> None:
-    recommender = MLRecommender({})
-    recommender.train()
+def test_ml_recommender_unknown_industry_type_does_not_crash(
+    trained_recommender: MLRecommender,
+) -> None:
+    recommender = trained_recommender
     risk_scores = {
         "pm25_score": 5.0,
         "pm10_score": 5.0,

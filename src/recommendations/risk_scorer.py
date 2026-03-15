@@ -130,6 +130,22 @@ class PollutionRiskScorer:
         Returns:
             pd.DataFrame: Risk scores for all factories.
         """
+        required_cols = {"nearest_factory_distance_km", "city"}
+        missing_cols = required_cols.difference(pollution_df.columns)
+        if pollution_df.empty or missing_cols:
+            if pollution_df.empty:
+                LOGGER.warning("pollution_df is empty — falling back to national mean for all factories")
+            if missing_cols:
+                LOGGER.warning("pollution_df missing columns %s — falling back to national mean", missing_cols)
+            national_mean = pollution_df.mean(numeric_only=True)
+            results = [self.compute_factory_risk(factory, national_mean)
+                       for _, factory in factories_df.iterrows()]
+            LOGGER.info(
+                "Risk scoring complete: %d factories, 0 city fallback, %d national fallback",
+                len(factories_df), len(factories_df)
+            )
+            return pd.DataFrame(results)
+
         results = []
         fallback_city = 0
         fallback_national = 0
