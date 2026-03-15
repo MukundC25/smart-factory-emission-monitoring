@@ -19,3 +19,8 @@ models/classification_report_table.png
 .env
 .env.*
 !.env.example
+
+# Frontend JS artifacts
+node_modules/
+frontend-vite/node_modules/
+frontend-vite/dist/

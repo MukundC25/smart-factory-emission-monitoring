@@ -208,6 +208,74 @@ Available routes:
 - `GET /pollution/stats`
 - `GET /health`
 
+## Frontend Storytelling UI (React + Mapbox)
+
+The repository now includes a Vite + React frontend in:
+
+- `frontend-vite/src/App.jsx`
+- `frontend-vite/src/App.css`
+- `frontend-vite/public/Untitled design.svg`
+
+### Features included
+
+- Persistent animated city background with smoke/fog, haze, skyline and water reflection
+- Multi-step environmental storytelling flow from landing page to final transformation
+- Route-based navigation and deep links:
+   - `/`
+   - `/city`
+   - `/questions`
+   - `/analysis`
+   - `/map`
+   - `/factory`
+   - `/ai-score`
+   - `/solutions`
+   - `/transformation`
+- Interactive Mapbox factory map with:
+   - marker rendering
+   - pollution color coding (green/yellow/red)
+   - click popup with factory details
+   - zoom and pan controls
+   - heatmap overlay layer
+- Factory detail report with pollutant metrics and trend chart
+- AI impact score page and solution recommendation page
+- Glassmorphism styling for question and selection elements
+- Landing page background supports the attached SVG (`public/Untitled design.svg`)
+
+### Run frontend locally
+
+1. Start backend API:
+
+```bash
+/Users/mukundchavan/Downloads/smart-factory-emission-monitoring/.venv/bin/python -m uvicorn backend.app.main:app --reload
+```
+
+2. Start frontend:
+
+```bash
+cd frontend-vite
+npm install
+npm run dev
+```
+
+3. Open:
+
+```text
+http://127.0.0.1:5173
+```
+
+The frontend reads data from backend JSON endpoints (instead of local CSV parsing):
+
+- `GET /factories/`
+- `GET /pollution/`
+- `GET /recommendation/`
+- `GET /recommendation/{factory_id}`
+
+Environment variables for frontend are in:
+
+- `frontend-vite/.env.example`
+
+Legacy no-build version is still available in `frontend/` for reference.
+
 ## Notes
 
 - Factory ingestion uses Overpass first, then Google Places only when key exists.
