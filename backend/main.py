@@ -21,8 +21,8 @@ from fastapi.responses import JSONResponse
 from backend.config import get_settings
 from backend.dependencies import get_data_loader
 from backend.utils.data_loader import DataLoader
-from backend.app.routes.factories import router as factories_router
-from backend.app.routes.pollution import router as pollution_router
+from backend.routers.factories import router as factories_router
+from backend.routers.pollution import router as pollution_router
 
 settings = get_settings()
 
@@ -35,12 +35,12 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Load datasets on startup and emit a shutdown log on app exit."""
-    # Create database tables
-    from backend.app.database.db import engine, Base
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created or verified.")
+    """Load datasets on startup and emit a shutdown log on app exit.
 
+    Note: Database schema should be prepared via Alembic migrations or an
+    external migration step before starting the application. This function
+    intentionally does not perform any synchronous schema-creation calls.
+    """
     override = getattr(app, "dependency_overrides", {}).get(get_data_loader)
     loader = override() if override is not None else get_data_loader()
     app.state.data_loader = loader

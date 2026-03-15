@@ -217,14 +217,29 @@ def store_pollution_reading(reading: PollutionReading, db: Session = Depends(get
     Returns:
         dict: Success message.
     """
+    from datetime import datetime
+
+    if not isinstance(reading.timestamp, str) or not reading.timestamp.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Timestamp is required and must be a non-empty ISO 8601 string",
+        )
     try:
-        from datetime import datetime
+        parsed_timestamp = datetime.fromisoformat(
+            reading.timestamp.replace("Z", "+00:00")
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail="Timestamp must be a valid ISO 8601 datetime string",
+        )
+    try:
         db_reading = DBPollutionReading(
             station_name=reading.station_name,
             station_lat=reading.station_lat,
             station_lon=reading.station_lon,
             city=reading.city,
-            timestamp=datetime.fromisoformat(reading.timestamp.replace('Z', '+00:00')) if reading.timestamp else None,
+            timestamp=parsed_timestamp,
             pm25=reading.pm25,
             pm10=reading.pm10,
             co=reading.co,

@@ -14,8 +14,10 @@ from ..schemas import (
     PollutionImpactPredictionRequest,
     PollutionImpactPredictionResponse,
 )
+from ..services.ml_service import get_ml_service
 from ..database.db import get_db
 from ..database.models import Factory as DBFactory, Recommendation
+from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/factories", tags=["Factories"])
@@ -243,6 +245,17 @@ def store_factory(factory: Factory, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(db_factory)
         return {"message": "Factory stored successfully", "id": db_factory.id}
+    except IntegrityError as e:
+        db.rollback()
+        logger.warning(
+            "IntegrityError while storing factory with factory_id %s: %s",
+            factory.factory_id,
+            e,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail="A factory with this factory_id already exists or violates a database constraint.",
+        )
     except Exception as e:
         db.rollback()
         logger.error("Error storing factory: %s", e)
