@@ -214,6 +214,8 @@ Available routes:
 - Pollution ingestion uses OpenAQ first, then CPCB placeholder, then synthetic fallback.
 - Missing pollutant values are imputed by station median, then global median.
 - Out-of-range pollutant values are clipped to configured bounds in `config.yaml`.
+- Note: FastAPI will automatically redirect trailing-slash paths (e.g. /factories/) to canonical routes (e.g. /factories).
+
 ```
 
 Example tasks:

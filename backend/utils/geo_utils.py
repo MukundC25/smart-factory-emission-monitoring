@@ -50,13 +50,12 @@ def bounding_box(
         radius_km: Half-width of box in kilometres.
 
     Returns:
-        Tuple (min_lat, max_lat, min_lon, max_lon).
+        Tuple of (min_lat, max_lat, min_lon, max_lon).
     """
+    eps = 1e-6
+    cos_lat = math.cos(math.radians(lat))
+    if abs(cos_lat) < eps:
+        cos_lat = math.copysign(eps, cos_lat if cos_lat != 0.0 else 1.0)
     delta_lat = radius_km / 111.0
-    delta_lon = radius_km / (111.0 * math.cos(math.radians(lat)))
-    return (
-        lat - delta_lat,
-        lat + delta_lat,
-        lon - delta_lon,
-        lon + delta_lon,
-    )
+    delta_lon = radius_km / (111.0 * cos_lat)
+    return lat - delta_lat, lat + delta_lat, lon - delta_lon, lon + delta_lon

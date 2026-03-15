@@ -103,7 +103,7 @@ def get_pollution(
             fdf = fdf[fdf["_ts"] <= pd.Timestamp(end_dt, tz="UTC")]
         fdf = fdf.drop(columns=["_ts"])
 
-    if lat is not None and lon is not None and "station_lat" in fdf.columns:
+    if lat is not None and lon is not None and {"station_lat", "station_lon"}.issubset(fdf.columns):
         min_lat, max_lat, min_lon, max_lon = bounding_box(lat, lon, radius_km)
         fdf = fdf[
             (fdf["station_lat"] >= min_lat)

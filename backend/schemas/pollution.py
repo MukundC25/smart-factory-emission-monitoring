@@ -27,6 +27,7 @@ class PollutionReading(BaseModel):
         co: Carbon monoxide in mg/m³.
         no2: Nitrogen dioxide in µg/m³.
         so2: Sulphur dioxide in µg/m³.
+        o3: Ozone concentration in µg/m³.
         aqi_index: Aggregate Air Quality Index.
         timestamp: UTC timestamp of this reading.
     """
@@ -50,6 +51,7 @@ class PollutionReading(BaseModel):
     co: Optional[float] = Field(default=None, description="CO concentration mg/m³")
     no2: Optional[float] = Field(default=None, description="NO₂ concentration µg/m³")
     so2: Optional[float] = Field(default=None, description="SO₂ concentration µg/m³")
+    o3: Optional[float] = Field(default=None, description="O₃ concentration µg/m³")
     aqi_index: Optional[float] = Field(
         default=None, description="Aggregate Air Quality Index"
     )

@@ -36,7 +36,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Load datasets on startup and emit a shutdown log on app exit."""
-    loader = get_data_loader()
+    override = getattr(app, "dependency_overrides", {}).get(get_data_loader)
+    loader = override() if override is not None else get_data_loader()
+    app.state.data_loader = loader
     info = loader.dataset_info()
     for name, count in info.items():
         if count == 0:
@@ -71,10 +73,12 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # CORS
 # ---------------------------------------------------------------------------
+_cors_uses_wildcard = any(o == "*" for o in settings.CORS_ORIGINS)
+_cors_allow_credentials = not _cors_uses_wildcard
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=_cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
