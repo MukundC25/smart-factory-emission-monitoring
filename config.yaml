@@ -5,8 +5,8 @@ project:
 paths:
   factories_raw: data/raw/factories/factories.csv
   pollution_raw: data/raw/pollution/pollution_readings.csv
-  pollution_processed: data/processed/pollution_clean.csv
-  processed_dataset: data/processed/ml_dataset.parquet
+  pollution_processed: data/processed/ml_dataset.csv
+  processed_dataset: data/processed/ml_dataset.csv
   recommendations: data/output/recommendations.csv
   dashboard: data/output/dashboard.html
   model: models/pollution_impact_model.pkl
