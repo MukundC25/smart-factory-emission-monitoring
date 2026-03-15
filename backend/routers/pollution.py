@@ -1,8 +1,9 @@
 """Pollution API router.
 
 Endpoints:
-  GET /pollution        — paginated readings with optional filters
-  GET /pollution/stats  — per-city aggregate statistics
+    GET /pollution                  — paginated readings with optional filters
+    GET /pollution/stats            — per-city aggregate statistics
+    GET /pollution/heatmap/data     — heatmap-ready pollution points for frontend rendering
 """
 
 from __future__ import annotations
@@ -11,10 +12,16 @@ import logging
 from datetime import date
 from typing import List, Optional
 
+import pandas as pd
+
 from fastapi import APIRouter, Depends, Query
 
 from backend.dependencies import get_data_loader
-from backend.schemas.pollution import PollutionListResponse, PollutionStats
+from backend.schemas.pollution import (
+    HeatmapDataResponse,
+    PollutionListResponse,
+    PollutionStats,
+)
 from backend.services.pollution_service import get_pollution, get_pollution_stats
 from backend.utils.data_loader import DataLoader
 
@@ -33,7 +40,7 @@ def list_pollution(
     city: Optional[str] = Query(None, description="Filter by city (substring)"),
     parameter: Optional[str] = Query(
         None,
-        pattern="^(pm25|pm10|co|no2|so2)$",
+        pattern="^(pm25|pm10|co|no2|so2|o3)$",
         description="Only return rows where this pollutant is present",
     ),
     start_date: Optional[date] = Query(
@@ -80,3 +87,77 @@ def pollution_stats(
 ) -> List[PollutionStats]:
     """Return per-city PM2.5, PM10, and AQI aggregates over the most-recent N days."""
     return get_pollution_stats(df=loader.load_pollution(), city=city, days=days)
+
+
+@router.get(
+    "/pollution/heatmap/data",
+    response_model=HeatmapDataResponse,
+    summary="Get pollution heatmap points for frontend rendering",
+)
+def get_heatmap_data(
+    parameter: str = Query(
+        "aqi_index",
+        pattern="^(aqi_index|pm25|pm10|no2|so2|co|o3)$",
+        description="Pollution parameter used as intensity value",
+    ),
+    city: Optional[str] = Query(None, description="Optional city filter"),
+    limit: int = Query(2000, ge=1, le=5000, description="Maximum points to return"),
+    loader: DataLoader = Depends(get_data_loader),
+) -> HeatmapDataResponse:
+    """Return frontend-ready heatmap points and metadata.
+
+    Response shape:
+        {
+          "points": [[lat, lon, intensity], ...],
+          "metadata": {...}
+        }
+    """
+    df = loader.load_pollution().copy()
+    if city and "city" in df.columns:
+        df = df[df["city"].str.contains(city, case=False, na=False)]
+
+    if parameter not in df.columns:
+        return HeatmapDataResponse(
+            points=[],
+            metadata={
+                "parameter": parameter,
+                "city": city,
+                "row_count": 0,
+                "returned_points": 0,
+                "message": f"Parameter '{parameter}' not found in dataset",
+            },
+        )
+
+    points_df = pd.DataFrame(
+        {
+            "lat": pd.to_numeric(df.get("station_lat"), errors="coerce"),
+            "lon": pd.to_numeric(df.get("station_lon"), errors="coerce"),
+            "intensity": pd.to_numeric(df.get(parameter), errors="coerce"),
+        }
+    ).dropna(subset=["lat", "lon", "intensity"])
+
+    points_df = points_df[(points_df["lat"] >= -90) & (points_df["lat"] <= 90)]
+    points_df = points_df[(points_df["lon"] >= -180) & (points_df["lon"] <= 180)]
+
+    if len(points_df) > limit:
+        # Randomly sample points (with fixed seed) to avoid geographic bias from row ordering.
+        points_df = points_df.sample(n=limit, random_state=42)
+
+    points = points_df[["lat", "lon", "intensity"]].astype(float).values.tolist()
+    return HeatmapDataResponse(
+        points=points,
+        metadata={
+            "parameter": parameter,
+            "city": city,
+            "row_count": int(len(df)),
+            "returned_points": int(len(points)),
+            "lat_range": [
+                float(points_df["lat"].min()) if not points_df.empty else None,
+                float(points_df["lat"].max()) if not points_df.empty else None,
+            ],
+            "lon_range": [
+                float(points_df["lon"].min()) if not points_df.empty else None,
+                float(points_df["lon"].max()) if not points_df.empty else None,
+            ],
+        },
+    )

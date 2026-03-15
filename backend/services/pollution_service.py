@@ -48,6 +48,7 @@ def _row_to_reading(row: pd.Series) -> PollutionReading:
         co=_opt_float("co"),
         no2=_opt_float("no2"),
         so2=_opt_float("so2"),
+        o3=_opt_float("o3"),
         aqi_index=_opt_float("aqi_index"),
         timestamp=timestamp,
     )
