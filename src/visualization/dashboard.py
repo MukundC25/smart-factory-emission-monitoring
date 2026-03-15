@@ -7,9 +7,11 @@ from typing import Any, Dict, Optional
 
 import folium
 import pandas as pd
-from folium.plugins import HeatMap, MarkerCluster
+from folium.plugins import MarkerCluster
 
 from src.common import get_project_root, initialize_environment
+from src.visualization.heatmap_data_prep import HeatmapDataPreparator
+from src.visualization.heatmap_generator import HeatmapGenerator, make_html_self_contained
 
 LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +46,15 @@ def build_dashboard(config: Optional[Dict[str, Any]] = None) -> str:
     """
     runtime_config = config or initialize_environment()
     recommendations, pollution = _load_inputs(runtime_config)
+    preparator = HeatmapDataPreparator()
+    heatmap_generator = HeatmapGenerator(runtime_config.get("heatmap", {}))
+
+    if not pollution.empty:
+        pollution = preparator.validate_coordinates(pollution)
+        intensity_col = preparator.resolve_intensity_column(pollution)
+        pollution = preparator.normalize_intensity(pollution, intensity_col)
+    else:
+        intensity_col = "aqi_index"
 
     center_lat = float(recommendations["latitude"].mean()) if not recommendations.empty else 20.5937
     center_lon = float(recommendations["longitude"].mean()) if not recommendations.empty else 78.9629
@@ -104,11 +115,12 @@ def build_dashboard(config: Optional[Dict[str, Any]] = None) -> str:
             icon=folium.Icon(color="blue", icon="cloud"),
         ).add_to(station_cluster)
 
-    heat_points = pollution[["station_lat", "station_lon", "pm25"]].dropna().values.tolist()
-    if heat_points:
-        HeatMap(heat_points, name="PM2.5 Heatmap", radius=18, blur=14, min_opacity=0.3).add_to(
-            dashboard_map
-        )
+    heat_points = preparator.get_heatmap_points(pollution) if not pollution.empty else []
+    heatmap_generator.add_heatmap_layer(dashboard_map, heat_points, intensity_col)
+    heatmap_generator.add_city_labels(dashboard_map, pollution)
+    heatmap_generator.intensity_label = intensity_col
+    heatmap_generator.timestamp_range_label = heatmap_generator.get_timestamp_range_label(pollution)
+    heatmap_generator.add_legend(dashboard_map)
 
     factory_cluster.add_to(factory_layer)
     station_cluster.add_to(station_layer)
@@ -119,6 +131,7 @@ def build_dashboard(config: Optional[Dict[str, Any]] = None) -> str:
     output_path = get_project_root() / runtime_config["paths"]["dashboard"]
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dashboard_map.save(str(output_path))
+    make_html_self_contained(output_path)
     LOGGER.info("Dashboard written to %s", output_path)
     return str(output_path)
 
