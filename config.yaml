@@ -9,6 +9,7 @@ paths:
   processed_dataset: data/processed/ml_dataset.csv
   recommendations: data/output/recommendations.csv
   dashboard: data/output/dashboard.html
+  pollution_heatmap: data/output/pollution_heatmap.html
   model: models/pollution_impact_model.pkl
   scaler: models/scaler.pkl
   model_report: models/model_report.json
@@ -89,3 +90,17 @@ ml:
 risk_bands:
   low_max: 3.0
   medium_max: 6.0
+
+heatmap:
+  tile_provider: "CartoDB positron"
+  zoom_start: 6
+  radius: 25
+  blur: 15
+  min_opacity: 0.4
+  max_zoom: 18
+  gradient:
+    "0.2": "#00FF00"
+    "0.4": "#FFFF00"
+    "0.6": "#FFA500"
+    "0.8": "#FF0000"
+    "1.0": "#800080"

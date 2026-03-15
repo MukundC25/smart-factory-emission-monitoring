@@ -201,6 +201,7 @@ def root() -> dict:
             "GET /factory/{id}         — factory detail with risk score & recommendations",
             "GET /pollution            — paginated pollution readings with filters",
             "GET /pollution/stats      — per-city PM2.5 / PM10 / AQI aggregates",
+            "GET /heatmap/data         — frontend-ready pollution heatmap points",
             "GET /health               — health check (always 200)",
             "GET /docs                 — interactive Swagger UI",
             "GET /redoc                — ReDoc API reference",
