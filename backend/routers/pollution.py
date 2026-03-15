@@ -10,25 +10,23 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import pandas as pd
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
 
 from backend.dependencies import get_data_loader
-from backend.schemas.pollution import PollutionListResponse, PollutionStats
+from backend.schemas.pollution import (
+    HeatmapDataResponse,
+    PollutionListResponse,
+    PollutionStats,
+)
 from backend.services.pollution_service import get_pollution, get_pollution_stats
 from backend.utils.data_loader import DataLoader
 
 router = APIRouter(tags=["Pollution"])
 logger = logging.getLogger(__name__)
-
-
-class HeatmapDataResponse(BaseModel):
-    points: List[List[float]]
-    metadata: Dict[str, Any]
 
 
 @router.get(

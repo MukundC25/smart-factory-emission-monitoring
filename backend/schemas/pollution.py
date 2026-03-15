@@ -9,7 +9,7 @@ All other column names match directly.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -94,3 +94,10 @@ class PollutionStats(BaseModel):
     avg_pm10: Optional[float] = None
     max_aqi: Optional[float] = None
     reading_count: int
+
+
+class HeatmapDataResponse(BaseModel):
+    """Response model for /pollution/heatmap/data endpoint."""
+
+    points: List[List[float]]
+    metadata: Dict[str, Any]

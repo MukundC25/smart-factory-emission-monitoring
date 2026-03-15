@@ -70,9 +70,7 @@ def generate_pollution_heatmap(config: Dict[str, Any] | None = None) -> Tuple[Pa
     df = preparator.validate_coordinates(df)
     intensity_col = preparator.resolve_intensity_column(df)
     df = preparator.normalize_intensity(df, intensity_col)
-    points = preparator.get_heatmap_points(df)
-    city_center = preparator.get_city_center(df)
-    LOGGER.info("Using map center lat=%.4f lon=%.4f", city_center[0], city_center[1])
+    LOGGER.info("Preparing heatmap with %d data points", len(df))
 
     heatmap_cfg = runtime_config.get("heatmap", {})
     generator = HeatmapGenerator(heatmap_cfg)
@@ -83,7 +81,7 @@ def generate_pollution_heatmap(config: Dict[str, Any] | None = None) -> Tuple[Pa
     output_path = root / output_rel
     generator.build_full_map(df=df, intensity_col=intensity_col, output_path=output_path)
 
-    return output_path, len(points), intensity_col
+    return output_path, len(df), intensity_col
 
 
 def main() -> None:
