@@ -2,16 +2,44 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
+import yaml
 
 from backend.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
+
+_CONFIG_CACHE: Optional[Dict[str, Any]] = None
+_CONFIG_PATH: Optional[Path] = None
+
+
+def _get_config() -> Dict[str, Any]:
+    global _CONFIG_CACHE, _CONFIG_PATH
+    if _CONFIG_CACHE is not None:
+        return _CONFIG_CACHE
+
+    env_path = os.getenv("APP_CONFIG_PATH")
+    config_path = Path(env_path) if env_path else Path(__file__).resolve().parent.parent.parent / "config.yaml"
+    _CONFIG_PATH = config_path
+
+    try:
+        with config_path.open("r", encoding="utf-8") as file:
+            _CONFIG_CACHE = yaml.safe_load(file) or {}
+    except FileNotFoundError:
+        logger.warning("Config not found at %s — using empty config", config_path)
+        _CONFIG_CACHE = {}
+    except Exception as exc:
+        logger.exception("Failed to load config: %s", exc)
+        _CONFIG_CACHE = {}
+
+    return _CONFIG_CACHE
 
 # ---------------------------------------------------------------------------
 # Canonical empty schemas — every column that downstream code may reference.
@@ -99,6 +127,7 @@ class DataLoader:
         self._factories: Optional[pd.DataFrame] = None
         self._pollution: Optional[pd.DataFrame] = None
         self._recommendations: Optional[pd.DataFrame] = None
+        self._recommendation_reports: Optional[List[Dict[str, Any]]] = None
         self._loaded_at: float = 0.0
 
     # ------------------------------------------------------------------
@@ -175,7 +204,53 @@ class DataLoader:
         self._recommendations = self._load_file(
             self._settings.RECOMMENDATIONS_CSV, _RECOMMENDATIONS_SCHEMA, "recommendations"
         )
+        self._recommendation_reports = self._load_recommendation_reports()
         self._loaded_at = time.monotonic()
+
+    def _resolve_recommendations_json_path(self) -> Path:
+        """Resolve recommendations JSON path from config.yaml.
+
+        Returns:
+            Path: Absolute recommendations JSON path.
+        """
+        config = _get_config()
+        base_dir = _CONFIG_PATH.parent if _CONFIG_PATH else Path.cwd()
+
+        output_json = config.get("recommendations", {}).get("output_json")
+        if output_json:
+            return (base_dir / str(output_json)).resolve()
+
+        recommendations_csv = config.get("paths", {}).get("recommendations")
+        if recommendations_csv:
+            return (base_dir / str(recommendations_csv)).with_suffix(".json").resolve()
+        return self._settings.RECOMMENDATIONS_CSV.with_suffix(".json")
+
+    def _load_recommendation_reports(self) -> List[Dict[str, Any]]:
+        """Load full recommendation reports from JSON output.
+
+        Returns:
+            List[Dict[str, Any]]: Report dictionaries.
+        """
+        path = self._resolve_recommendations_json_path()
+        if not path.exists():
+            logger.warning("recommendations_json file not found at %s — returning empty list", path)
+            return []
+
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            reports = payload.get("reports", [])
+            if isinstance(reports, list):
+                logger.info("Loaded recommendations_json: %d reports from %s", len(reports), path)
+                return reports
+            logger.warning("recommendations_json payload malformed at %s — returning empty list", path)
+            return []
+        except Exception as exc:
+            logger.exception(
+                "Failed to load recommendations_json from %s — returning empty list: %s",
+                path,
+                exc,
+            )
+            return []
 
     # ------------------------------------------------------------------
     # Public API
@@ -210,6 +285,16 @@ class DataLoader:
         if self._recommendations is None or self._is_stale():
             self._load_all()
         return self._recommendations.copy()  # type: ignore[return-value]
+
+    def load_recommendation_reports(self) -> List[Dict[str, Any]]:
+        """Return recommendations JSON reports, reloading from disk if stale.
+
+        Returns:
+            List[Dict[str, Any]]: Full recommendation reports.
+        """
+        if self._recommendation_reports is None or self._is_stale():
+            self._load_all()
+        return list(self._recommendation_reports or [])
 
     def refresh(self) -> None:
         """Force reload all datasets from disk, ignoring cache TTL."""

@@ -23,6 +23,7 @@ from backend.dependencies import get_data_loader
 from backend.utils.data_loader import DataLoader
 from backend.routers.factories import router as factories_router
 from backend.routers.pollution import router as pollution_router
+from backend.routers.recommendations import router as recommendations_router
 
 settings = get_settings()
 
@@ -93,6 +94,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 app.include_router(factories_router)
 app.include_router(pollution_router)
+app.include_router(recommendations_router)
 
 # ---------------------------------------------------------------------------
 # Request logging middleware
@@ -201,12 +203,17 @@ def root() -> dict:
     return {
         "name": "Smart Factory Emission Monitoring API",
         "version": "2.0.0",
+        "description": "Recommendations endpoints: /recommendations, /recommendations/stats, /recommendations/{factory_id}, /recommendations/generate",
         "endpoints": [
             "GET /factories            — paginated factory list with filters",
             "GET /factory/{id}         — factory detail with risk score & recommendations",
             "GET /pollution            — paginated pollution readings with filters",
             "GET /pollution/stats      — per-city PM2.5 / PM10 / AQI aggregates",
             "GET /pollution/heatmap/data — frontend-ready pollution heatmap points",
+            "GET /recommendations      — paginated recommendation summaries",
+            "GET /recommendations/{factory_id} — full recommendation report",
+            "GET /recommendations/stats — recommendation aggregate stats",
+            "POST /recommendations/generate — regenerate recommendations synchronously",
             "GET /health               — health check (always 200)",
             "GET /docs                 — interactive Swagger UI",
             "GET /redoc                — ReDoc API reference",
