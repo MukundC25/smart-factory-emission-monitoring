@@ -1,7 +1,257 @@
-from fastapi import APIRouter
+"""Factory data and prediction endpoints."""
 
+import logging
+from pathlib import Path
+from typing import List, Optional
+
+from fastapi import APIRouter, HTTPException, Query
+import pandas as pd
+
+from ..schemas import (
+    Factory,
+    PollutionImpactPredictionRequest,
+    PollutionImpactPredictionResponse,
+)
+from ..services.ml_service import get_ml_service
+
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/factories", tags=["Factories"])
 
-@router.get("/")
-def get_factories():
-    return {"data": "List of factories"}
+# Cache for factory data
+_factories_cache: Optional[pd.DataFrame] = None
+
+
+def _load_factories_data(csv_path: Optional[Path] = None) -> pd.DataFrame:
+    """Load factory data from CSV.
+
+    Args:
+        csv_path: Optional path to factories CSV.
+
+    Returns:
+        pd.DataFrame: Factory dataset.
+    """
+    global _factories_cache
+
+    if _factories_cache is not None:
+        return _factories_cache
+
+    if csv_path is None:
+        from pathlib import Path as PathlibPath
+
+        csv_path = PathlibPath(__file__).parent.parent.parent.parent / "data" / "raw" / "factories" / "factories.csv"
+
+    if not csv_path.exists():
+        logger.warning("Factories CSV not found at %s", csv_path)
+        return pd.DataFrame()
+
+    _factories_cache = pd.read_csv(csv_path)
+    logger.info("Loaded %d factories from %s", len(_factories_cache), csv_path)
+    return _factories_cache
+
+
+@router.get("/", response_model=List[Factory])
+def get_factories(city: Optional[str] = Query(None), limit: int = Query(100, ge=1, le=1000)):
+    """Get list of all factories with optional filtering.
+
+    Args:
+        city: Optional city filter.
+        limit: Maximum number of results.
+
+    Returns:
+        List[Factory]: List of factories.
+    """
+    try:
+        df = _load_factories_data()
+
+        if df.empty:
+            return []
+
+        if city:
+            df = df[df["city"].str.lower() == city.lower()]
+
+        df = df.head(limit)
+        factories = []
+        for _, row in df.iterrows():
+            factory = Factory(
+                factory_id=str(row.get("factory_id", "")),
+                factory_name=str(row.get("factory_name", "")),
+                industry_type=str(row.get("industry_type", "")),
+                latitude=float(row.get("latitude", 0)),
+                longitude=float(row.get("longitude", 0)),
+                city=str(row.get("city", "")),
+                state=str(row.get("state", "")),
+                country=str(row.get("country", "")),
+            )
+            factories.append(factory)
+        return factories
+
+    except Exception as e:
+        logger.error("Error fetching factories: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to retrieve factories")
+
+
+@router.get("/{factory_id}", response_model=Factory)
+def get_factory_by_id(factory_id: str):
+    """Get specific factory by ID.
+
+    Args:
+        factory_id: Factory identifier.
+
+    Returns:
+        Factory: Factory data.
+
+    Raises:
+        HTTPException: If factory not found.
+    """
+    try:
+        df = _load_factories_data()
+
+        if df.empty:
+            raise HTTPException(status_code=404, detail="Factory not found")
+
+        factory_row = df[df["factory_id"] == factory_id]
+
+        if factory_row.empty:
+            raise HTTPException(status_code=404, detail=f"Factory {factory_id} not found")
+
+        row = factory_row.iloc[0]
+        return Factory(
+            factory_id=str(row.get("factory_id", "")),
+            factory_name=str(row.get("factory_name", "")),
+            industry_type=str(row.get("industry_type", "")),
+            latitude=float(row.get("latitude", 0)),
+            longitude=float(row.get("longitude", 0)),
+            city=str(row.get("city", "")),
+            state=str(row.get("state", "")),
+            country=str(row.get("country", "")),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error fetching factory %s: %s", factory_id, e)
+        raise HTTPException(status_code=500, detail="Failed to retrieve factory")
+
+
+@router.post("/predict", response_model=PollutionImpactPredictionResponse)
+def predict_pollution_impact(request: PollutionImpactPredictionRequest):
+    """Predict pollution impact score for a factory.
+
+    Args:
+        request: Factory data with features.
+
+    Returns:
+        PollutionImpactPredictionResponse: Prediction result with risk level.
+
+    Raises:
+        HTTPException: If prediction fails.
+    """
+    try:
+        service = get_ml_service()
+
+        if not service.is_ready():
+            raise HTTPException(
+                status_code=503,
+                detail="ML model not loaded. Service unavailable.",
+            )
+
+        features_dict = request.dict()
+        predicted_score = service.predict_single(features_dict)
+        risk_level = service.get_risk_level(predicted_score)
+
+        return PollutionImpactPredictionResponse(
+            factory_id=request.factory_id,
+            factory_name=request.factory_name,
+            industry_type=request.industry_type,
+            latitude=request.latitude,
+            longitude=request.longitude,
+            city=request.city,
+            predicted_pollution_impact_score=predicted_score,
+            risk_level=risk_level,
+            confidence_context=f"Predicted score based on {request.industry_type} factory in {request.city}",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Prediction error: %s", e)
+        raise HTTPException(status_code=500, detail="Prediction failed")
+
+
+@router.get("/batch/predict-all", response_model=List[PollutionImpactPredictionResponse])
+def predict_all_factories():
+    """Predict pollution impact for all factories in database.
+
+    Returns:
+        List[PollutionImpactPredictionResponse]: Predictions for all factories.
+
+    Raises:
+        HTTPException: If prediction fails.
+    """
+    try:
+        service = get_ml_service()
+
+        if not service.is_ready():
+            raise HTTPException(
+                status_code=503,
+                detail="ML model not loaded. Service unavailable.",
+            )
+
+        df = _load_factories_data()
+
+        if df.empty:
+            return []
+
+        predictions = []
+        for _, row in df.iterrows():
+            try:
+                features_dict = {
+                    "factory_id": str(row.get("factory_id", "")),
+                    "factory_name": str(row.get("factory_name", "")),
+                    "industry_type": str(row.get("industry_type", "")),
+                    "latitude": float(row.get("latitude", 0)),
+                    "longitude": float(row.get("longitude", 0)),
+                    "city": str(row.get("city", "")),
+                    "state": str(row.get("state", "")),
+                    "country": str(row.get("country", "")),
+                    "pm25": float(row.get("pm25", 0)),
+                    "pm10": float(row.get("pm10", 0)),
+                    "co": float(row.get("co", 0)),
+                    "no2": float(row.get("no2", 0)),
+                    "so2": float(row.get("so2", 0)),
+                    "o3": float(row.get("o3", 0)),
+                    "distance_to_nearest_station": float(row.get("distance_to_nearest_station", 0)),
+                    "rolling_avg_pm25_7d": float(row.get("rolling_avg_pm25_7d", 0)),
+                    "rolling_avg_pm25_30d": float(row.get("rolling_avg_pm25_30d", 0)),
+                    "pollution_spike_flag": int(row.get("pollution_spike_flag", 0)),
+                    "season": str(row.get("season", "unknown")),
+                    "wind_direction_factor": float(row.get("wind_direction_factor", 1.0)),
+                    "industry_risk_weight": float(row.get("industry_risk_weight", 6.0)),
+                }
+                predicted_score = service.predict_single(features_dict)
+                risk_level = service.get_risk_level(predicted_score)
+
+                predictions.append(
+                    PollutionImpactPredictionResponse(
+                        factory_id=features_dict["factory_id"],
+                        factory_name=features_dict["factory_name"],
+                        industry_type=features_dict["industry_type"],
+                        latitude=features_dict["latitude"],
+                        longitude=features_dict["longitude"],
+                        city=features_dict["city"],
+                        predicted_pollution_impact_score=predicted_score,
+                        risk_level=risk_level,
+                    )
+                )
+            except Exception as e:
+                logger.warning("Failed to predict for factory %s: %s", row.get("factory_id"), e)
+                continue
+
+        logger.info("Generated predictions for %d factories", len(predictions))
+        return predictions
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Batch prediction error: %s", e)
+        raise HTTPException(status_code=500, detail="Batch prediction failed")

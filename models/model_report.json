@@ -2,25 +2,63 @@
   "selected_model": "xgboost",
   "metrics": {
     "random_forest": {
-      "rmse": 0.2752819456311059,
-      "mae": 0.20470383230155215,
-      "r2": 0.9677945934248198
+      "rmse": 0.2752819456311058,
+      "mae": 0.20470383230155198,
+      "mape": 0.030406165448384263,
+      "r2": 0.9677945934248198,
+      "cv_r2_mean": 0.9649867247618378,
+      "cv_r2_std": 0.005685717114010625
     },
     "xgboost": {
       "rmse": 0.2570321648158747,
       "mae": 0.20267120191538926,
-      "r2": 0.971923156835637
+      "mape": 0.028928165706271786,
+      "r2": 0.971923156835637,
+      "cv_r2_mean": 0.9737104472332687,
+      "cv_r2_std": 0.0021363978764191863
     }
   },
   "config": {
     "target_column": "pollution_impact_score",
     "feature_count": 28,
+    "feature_list": [
+      "pm25",
+      "pm10",
+      "co",
+      "no2",
+      "so2",
+      "o3",
+      "aqi_index",
+      "station_name",
+      "station_lat",
+      "station_lon",
+      "city",
+      "country",
+      "source",
+      "nearest_factory_distance_km",
+      "factory_id",
+      "factory_name",
+      "industry_type",
+      "latitude",
+      "longitude",
+      "state",
+      "osm_id",
+      "distance_to_nearest_station",
+      "rolling_avg_pm25_7d",
+      "rolling_avg_pm25_30d",
+      "pollution_spike_flag",
+      "season",
+      "wind_direction_factor",
+      "industry_risk_weight"
+    ],
     "train_rows": 425,
-    "test_rows": 75
+    "test_rows": 75,
+    "total_rows": 500
   },
   "artifacts": {
-    "model": "C:\\Users\\PRANAV KADAM\\smart-factory-emission-monitoring\\models\\pollution_impact_model.pkl",
-    "scaler": "C:\\Users\\PRANAV KADAM\\smart-factory-emission-monitoring\\models\\scaler.pkl",
-    "feature_importance_plot": "C:\\Users\\PRANAV KADAM\\smart-factory-emission-monitoring\\models\\feature_importance.png"
+    "model": "C:\\Users\\Asus\\smart-factory-emission-monitoring\\models\\pollution_impact_model.pkl",
+    "scaler": "C:\\Users\\Asus\\smart-factory-emission-monitoring\\models\\scaler.pkl",
+    "feature_importance_plot": "C:\\Users\\Asus\\smart-factory-emission-monitoring\\models\\feature_importance.png",
+    "model_comparison_plot": "C:\\Users\\Asus\\smart-factory-emission-monitoring\\models\\model_comparison.png"
   }
 }
