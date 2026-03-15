@@ -1,8 +1,9 @@
 """Pollution API router.
 
 Endpoints:
-  GET /pollution        — paginated readings with optional filters
-  GET /pollution/stats  — per-city aggregate statistics
+    GET /pollution                  — paginated readings with optional filters
+    GET /pollution/stats            — per-city aggregate statistics
+    GET /pollution/heatmap/data     — heatmap-ready pollution points for frontend rendering
 """
 
 from __future__ import annotations
@@ -85,7 +86,7 @@ def pollution_stats(
 
 
 @router.get(
-    "/heatmap/data",
+    "/pollution/heatmap/data",
     summary="Get pollution heatmap points for frontend rendering",
 )
 def get_heatmap_data(
@@ -107,7 +108,7 @@ def get_heatmap_data(
         }
     """
     df = loader.load_pollution().copy()
-    if city:
+    if city and "city" in df.columns:
         df = df[df["city"].str.contains(city, case=False, na=False)]
 
     if parameter not in df.columns:

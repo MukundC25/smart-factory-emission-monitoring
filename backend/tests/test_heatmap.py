@@ -11,11 +11,6 @@ from src.visualization.heatmap_data_prep import HeatmapDataPreparator
 from src.visualization.heatmap_generator import HeatmapGenerator
 
 
-class _EmptyLoader:
-    def load_pollution(self) -> pd.DataFrame:
-        return pd.DataFrame()
-
-
 def test_heatmap_generates_html_file(tmp_path: Path) -> None:
     """Heatmap HTML is generated for valid pollution input."""
     prep = HeatmapDataPreparator()
@@ -56,7 +51,7 @@ def test_heatmap_with_empty_dataframe_does_not_crash(tmp_path: Path) -> None:
 
 def test_heatmap_data_endpoint_returns_points(client: TestClient) -> None:
     """Heatmap API endpoint returns point payload and metadata."""
-    response = client.get("/heatmap/data?parameter=pm25&limit=2")
+    response = client.get("/pollution/heatmap/data?parameter=pm25&limit=2")
     assert response.status_code == 200
     body = response.json()
     assert "points" in body
@@ -67,7 +62,7 @@ def test_heatmap_data_endpoint_returns_points(client: TestClient) -> None:
 
 def test_heatmap_data_endpoint_empty_dataset(empty_client: TestClient) -> None:
     """Heatmap API endpoint returns empty points for empty dataset."""
-    response = empty_client.get("/heatmap/data")
+    response = empty_client.get("/pollution/heatmap/data")
     assert response.status_code == 200
     body = response.json()
     assert body["points"] == []

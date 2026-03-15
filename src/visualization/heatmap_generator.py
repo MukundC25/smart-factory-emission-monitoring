@@ -201,12 +201,14 @@ class HeatmapGenerator:
             city_html = html.escape(city)
             timestamp_html = html.escape(timestamp)
             aqi_html = html.escape(aqi)
+            pm25_html = html.escape(pm25)
+            pm10_html = html.escape(pm10)
 
             popup_html = (
                 f"<b>{station_name_html}</b><br>"
                 f"City: {city_html}<br>"
-                f"PM2.5: {pm25}<br>"
-                f"PM10: {pm10}<br>"
+                f"PM2.5: {pm25_html}<br>"
+                f"PM10: {pm10_html}<br>"
                 f"AQI: {aqi_html}<br>"
                 f"Band: {aqi_band}<br>"
                 f"Timestamp: {timestamp_html}"
