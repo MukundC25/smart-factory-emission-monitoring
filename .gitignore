@@ -24,3 +24,4 @@ models/classification_report_table.png
 node_modules/
 frontend-vite/node_modules/
 frontend-vite/dist/
+frontend-vite/.vite/
