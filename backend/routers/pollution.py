@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
 from backend.dependencies import get_data_loader
 from backend.schemas.pollution import PollutionListResponse, PollutionStats
@@ -23,6 +24,11 @@ from backend.utils.data_loader import DataLoader
 
 router = APIRouter(tags=["Pollution"])
 logger = logging.getLogger(__name__)
+
+
+class HeatmapDataResponse(BaseModel):
+    points: List[List[float]]
+    metadata: Dict[str, Any]
 
 
 @router.get(
@@ -87,6 +93,7 @@ def pollution_stats(
 
 @router.get(
     "/pollution/heatmap/data",
+    response_model=HeatmapDataResponse,
     summary="Get pollution heatmap points for frontend rendering",
 )
 def get_heatmap_data(
@@ -98,7 +105,7 @@ def get_heatmap_data(
     city: Optional[str] = Query(None, description="Optional city filter"),
     limit: int = Query(2000, ge=1, le=5000, description="Maximum points to return"),
     loader: DataLoader = Depends(get_data_loader),
-) -> Dict[str, Any]:
+) -> HeatmapDataResponse:
     """Return frontend-ready heatmap points and metadata.
 
     Response shape:
@@ -112,16 +119,16 @@ def get_heatmap_data(
         df = df[df["city"].str.contains(city, case=False, na=False)]
 
     if parameter not in df.columns:
-        return {
-            "points": [],
-            "metadata": {
+        return HeatmapDataResponse(
+            points=[],
+            metadata={
                 "parameter": parameter,
                 "city": city,
                 "row_count": 0,
                 "returned_points": 0,
                 "message": f"Parameter '{parameter}' not found in dataset",
             },
-        }
+        )
 
     points_df = pd.DataFrame(
         {
@@ -138,9 +145,9 @@ def get_heatmap_data(
         points_df = points_df.sample(n=limit, random_state=42)  # Replace head() with sample()
 
     points = points_df[["lat", "lon", "intensity"]].astype(float).values.tolist()
-    return {
-        "points": points,
-        "metadata": {
+    return HeatmapDataResponse(
+        points=points,
+        metadata={
             "parameter": parameter,
             "city": city,
             "row_count": int(len(df)),
@@ -154,4 +161,4 @@ def get_heatmap_data(
                 float(points_df["lon"].max()) if not points_df.empty else None,
             ],
         },
-    }
+    )

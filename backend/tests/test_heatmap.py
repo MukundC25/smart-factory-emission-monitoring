@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +10,8 @@ from fastapi.testclient import TestClient
 
 from src.visualization.heatmap_data_prep import HeatmapDataPreparator
 from src.visualization.heatmap_generator import HeatmapGenerator
+
+os.environ.setdefault("HEATMAP_INLINE_ASSETS", "0")
 
 
 def test_heatmap_generates_html_file(tmp_path: Path) -> None:
