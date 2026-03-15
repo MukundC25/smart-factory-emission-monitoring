@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import joblib
 import matplotlib.pyplot as plt
@@ -14,7 +14,13 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+    mean_absolute_percentage_error,
+)
+from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -36,7 +42,10 @@ class ModelResult:
     pipeline: Pipeline
     rmse: float
     mae: float
+    mape: float
     r2: float
+    cv_r2_mean: float
+    cv_r2_std: float
 
 
 def _load_dataset(config: Dict[str, Any]) -> pd.DataFrame:
@@ -101,7 +110,7 @@ def _evaluate_model(
     x_test: pd.DataFrame,
     y_test: pd.Series,
 ) -> ModelResult:
-    """Fit and evaluate one model pipeline.
+    """Fit and evaluate one model pipeline with cross-validation.
 
     Args:
         name: Model name.
@@ -112,15 +121,46 @@ def _evaluate_model(
         y_test: Test labels.
 
     Returns:
-        ModelResult: Fitted model metrics.
+        ModelResult: Fitted model metrics including cross-validation scores.
     """
+    # Fit on training data
     pipeline.fit(x_train, y_train)
+
+    # Generate test predictions
     predictions = pipeline.predict(x_test)
+
+    # Calculate metrics
     rmse = float(np.sqrt(mean_squared_error(y_test, predictions)))
     mae = float(mean_absolute_error(y_test, predictions))
+    mape = float(mean_absolute_percentage_error(y_test, predictions))
     r2 = float(r2_score(y_test, predictions))
-    LOGGER.info("%s | RMSE=%.4f MAE=%.4f R2=%.4f", name, rmse, mae, r2)
-    return ModelResult(name=name, pipeline=pipeline, rmse=rmse, mae=mae, r2=r2)
+
+    # Cross-validation evaluation (5-fold)
+    cv_scores = cross_val_score(pipeline, x_train, y_train, cv=5, scoring="r2")
+    cv_r2_mean = float(cv_scores.mean())
+    cv_r2_std = float(cv_scores.std())
+
+    LOGGER.info(
+        "%s | RMSE=%.4f MAE=%.4f MAPE=%.4f R2=%.4f | CV-R2=%.4f±%.4f",
+        name,
+        rmse,
+        mae,
+        mape,
+        r2,
+        cv_r2_mean,
+        cv_r2_std,
+    )
+
+    return ModelResult(
+        name=name,
+        pipeline=pipeline,
+        rmse=rmse,
+        mae=mae,
+        mape=mape,
+        r2=r2,
+        cv_r2_mean=cv_r2_mean,
+        cv_r2_std=cv_r2_std,
+    )
 
 
 def _save_feature_importance(best_model: Pipeline, output_path: Any) -> None:
@@ -142,11 +182,68 @@ def _save_feature_importance(best_model: Pipeline, output_path: Any) -> None:
 
     plt.figure(figsize=(10, 6))
     plt.barh(labels, top_values)
-    plt.title("Top Feature Importances")
+    plt.title("Top 20 Feature Importances")
     plt.xlabel("Importance")
     plt.tight_layout()
-    plt.savefig(output_path)
+    plt.savefig(output_path, dpi=100, bbox_inches="tight")
     plt.close()
+    LOGGER.info("Feature importance plot saved to %s", output_path)
+
+
+def _save_model_comparison(results: List[ModelResult], output_path: Any) -> None:
+    """Create visualization comparing model performance.
+
+    Args:
+        results: List of model evaluation results.
+        output_path: Plot output path.
+    """
+    if not results:
+        return
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle("Model Performance Comparison", fontsize=16, fontweight="bold")
+
+    model_names = [r.name for r in results]
+
+    # RMSE comparison
+    ax = axes[0, 0]
+    ax.bar(model_names, [r.rmse for r in results], color="steelblue", alpha=0.7)
+    ax.set_ylabel("RMSE (lower is better)")
+    ax.set_title("Root Mean Squared Error")
+    ax.grid(axis="y", alpha=0.3)
+
+    # MAE comparison
+    ax = axes[0, 1]
+    ax.bar(model_names, [r.mae for r in results], color="coral", alpha=0.7)
+    ax.set_ylabel("MAE (lower is better)")
+    ax.set_title("Mean Absolute Error")
+    ax.grid(axis="y", alpha=0.3)
+
+    # R² comparison
+    ax = axes[1, 0]
+    ax.bar(model_names, [r.r2 for r in results], color="mediumseagreen", alpha=0.7)
+    ax.set_ylabel("R² (higher is better)")
+    ax.set_title("R² Score (Test Set)")
+    ax.set_ylim([min(0, min([r.r2 for r in results]) - 0.1), 1.0])
+    ax.grid(axis="y", alpha=0.3)
+
+    # Cross-validation R² comparison
+    ax = axes[1, 1]
+    x_pos = np.arange(len(model_names))
+    cv_means = [r.cv_r2_mean for r in results]
+    cv_stds = [r.cv_r2_std for r in results]
+    ax.bar(x_pos, cv_means, yerr=cv_stds, capsize=5, color="mediumpurple", alpha=0.7)
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(model_names)
+    ax.set_ylabel("R² (5-fold CV)")
+    ax.set_title("Cross-Validation R² Score")
+    ax.set_ylim([min(0, min(cv_means) - 0.2), 1.0])
+    ax.grid(axis="y", alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=100, bbox_inches="tight")
+    plt.close()
+    LOGGER.info("Model comparison plot saved to %s", output_path)
 
 
 def train_models(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -156,7 +253,7 @@ def train_models(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         config: Optional pre-loaded configuration.
 
     Returns:
-        Dict[str, Any]: Training summary report.
+        Dict[str, Any]: Training summary report with comprehensive metrics.
     """
     runtime_config = config or initialize_environment()
     dataset = _load_dataset(runtime_config)
@@ -176,6 +273,13 @@ def train_models(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     x_test = test_df[feature_cols]
     y_test = test_df[target_col]
 
+    LOGGER.info(
+        "Dataset split: Train+Val=%d rows, Test=%d rows, Features=%d",
+        len(train_val_df),
+        len(test_df),
+        len(feature_cols),
+    )
+
     preprocessor = _build_preprocessor(train_val_df[feature_cols])
     random_forest = RandomForestRegressor(
         n_estimators=int(runtime_config["ml"]["n_estimators"]),
@@ -183,7 +287,7 @@ def train_models(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         n_jobs=-1,
     )
 
-    candidates: List[tuple[str, Any]] = [("random_forest", random_forest)]
+    candidates: List[Tuple[str, Any]] = [("random_forest", random_forest)]
     if XGBRegressor is not None:
         xgb = XGBRegressor(
             n_estimators=350,
@@ -199,6 +303,7 @@ def train_models(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 
     results: List[ModelResult] = []
     for name, estimator in candidates:
+        LOGGER.info("Training %s model...", name)
         pipeline = Pipeline(
             steps=[("preprocessor", preprocessor), ("model", estimator)]
         )
@@ -210,6 +315,7 @@ def train_models(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     scaler_path = root / runtime_config["paths"]["scaler"]
     report_path = root / runtime_config["paths"]["model_report"]
     importance_path = root / "models" / "feature_importance.png"
+    comparison_path = root / "models" / "model_comparison.png"
 
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(best.pipeline, model_path)
@@ -220,30 +326,63 @@ def train_models(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     joblib.dump(scaler, scaler_path)
 
     _save_feature_importance(best.pipeline, importance_path)
+    _save_model_comparison(results, comparison_path)
 
+    project_root = get_project_root()
     report = {
         "selected_model": best.name,
         "metrics": {
-            item.name: {"rmse": item.rmse, "mae": item.mae, "r2": item.r2}
+            item.name: {
+                "rmse": item.rmse,
+                "mae": item.mae,
+                "mape": item.mape,
+                "r2": item.r2,
+                "cv_r2_mean": item.cv_r2_mean,
+                "cv_r2_std": item.cv_r2_std,
+            }
             for item in results
         },
         "config": {
             "target_column": target_col,
             "feature_count": len(feature_cols),
+            "feature_list": feature_cols,
             "train_rows": int(len(train_val_df)),
             "test_rows": int(len(test_df)),
+            "total_rows": int(len(dataset)),
         },
         "artifacts": {
-            "model": str(model_path),
-            "scaler": str(scaler_path),
-            "feature_importance_plot": str(importance_path),
+            "model": str(
+                model_path.relative_to(project_root)
+                if model_path.is_absolute()
+                else model_path
+            ),
+            "scaler": str(
+                scaler_path.relative_to(project_root)
+                if scaler_path.is_absolute()
+                else scaler_path
+            ),
+            "feature_importance_plot": str(
+                importance_path.relative_to(project_root)
+                if importance_path.is_absolute()
+                else importance_path
+            ),
+            "model_comparison_plot": str(
+                comparison_path.relative_to(project_root)
+                if comparison_path.is_absolute()
+                else comparison_path
+            ),
         },
     }
 
     with report_path.open("w", encoding="utf-8") as file:
         json.dump(report, file, indent=2)
 
-    LOGGER.info("Model training complete. Best model: %s", best.name)
+    LOGGER.info(
+        "Model training complete. Best model: %s (RMSE=%.4f, R2=%.4f)",
+        best.name,
+        best.rmse,
+        best.r2,
+    )
     return report
 
 
