@@ -24,14 +24,26 @@ const MAPBOX_TOKEN =
   import.meta.env.VITE_MAPBOX_TOKEN ||
   'pk.eyJ1IjoibXVrdW5kMjAzMyIsImEiOiJjbW1xNThkdWMwcnYzMnFxdHJtNXFycmxhIn0.lfX0rAPb3cx_C7XGj-yOgw'
 
-const CITY_OPTIONS = ['Delhi', 'Mumbai', 'Pune', 'Bangalore', 'Chennai']
+const CITY_OPTIONS = ['Delhi', 'Pune', 'Chennai', 'Bengaluru', 'Kolkata', 'Ahmedabad', 'Coimbatore', 'Surat', 'Nagpur', 'Visakhapatnam', 'Patna', 'Indore', 'Bhopal', 'Jaipur', 'Lucknow', 'Varanasi', 'Kanpur']
 
 const CITY_CENTERS = {
   Delhi: [77.1025, 28.7041],
-  Mumbai: [72.8777, 19.076],
   Pune: [73.8567, 18.5204],
-  Bangalore: [77.5946, 12.9716],
   Chennai: [80.2707, 13.0827],
+  Bengaluru: [77.5946, 12.9716],
+  Kolkata: [88.3639, 22.5726],
+  Ahmedabad: [72.5714, 23.0225],
+  Coimbatore: [76.9558, 11.0168],
+  Surat: [72.8311, 21.1702],
+  Nagpur: [79.0882, 21.1458],
+  Visakhapatnam: [83.2185, 17.6868],
+  Patna: [85.1376, 25.5941],
+  Indore: [75.8577, 22.7196],
+  Bhopal: [77.4126, 23.2599],
+  Jaipur: [75.7873, 26.9124],
+  Lucknow: [80.9462, 26.8467],
+  Varanasi: [83.0104, 25.3176],
+  Kanpur: [80.3319, 26.4499],
 }
 
 const ROUTE_ORDER = ['/', '/city', '/questions', '/analysis', '/map', '/factory', '/ai-score', '/solutions', '/transformation']
@@ -40,12 +52,12 @@ const QUESTIONS = [
   {
     id: 'sector',
     label: 'Which industrial sector do you want to analyze?',
-    options: ['Steel', 'Chemical', 'Power Plant', 'Manufacturing', 'Mixed Industry'],
+    options: ['Industrial', 'Works', 'Factory', 'Warehouse', 'Depot', 'All Sectors'],
   },
   {
     id: 'concern',
     label: 'What pollution concern is most important?',
-    options: ['Air Quality', 'CO2 Emissions', 'Industrial Smoke', 'Water Pollution'],
+    options: ['Air Quality', 'Particulate Matter (PM2.5/PM10)', 'CO2 Emissions', 'Industrial Smoke', 'Water Pollution'],
   },
   {
     id: 'scope',
@@ -106,27 +118,23 @@ function useFactoryData(city) {
     async function fetchFactories() {
       setLoading(true)
       try {
-        const query = new URLSearchParams({ city, limit: '350' })
+        const query = new URLSearchParams({ city, page: '1', page_size: '200' })
         const response = await fetch(`${API_BASE_URL}/factories?${query}`)
         if (!response.ok) {
           throw new Error('Factory fetch failed')
         }
         const payload = await response.json()
         if (!active) return
-        const items = (payload.data || []).map((item, index) => {
-          const score = normalizeScore(item.pollution_score)
-          return {
-            ...item,
-            pollution_score: score,
-            risk_level: item.risk_level || getRiskLabel(score),
-            primary_pollutant:
-              item.primary_pollutant || (score >= 70 ? 'PM2.5' : score >= 40 ? 'NO2' : 'CO'),
-            latest_pm25: Number(item.latest_pm25 || (22 + score * 1.1 + index % 7).toFixed(1)),
-            latest_pm10: Number(item.latest_pm10 || (36 + score * 1.4 + index % 11).toFixed(1)),
-            latitude: Number(item.latitude),
-            longitude: Number(item.longitude),
-          }
-        })
+        const items = (payload.data || []).map((item) => ({
+          ...item,
+          pollution_score: normalizeScore(item.pollution_impact_score),
+          risk_level: item.risk_level || 'Medium',
+          primary_pollutant: item.dominant_pollutant || 'PM2.5',
+          latest_pm25: Number(item.latest_pm25 || 0),
+          latest_pm10: Number(item.latest_pm10 || 0),
+          latitude: Number(item.latitude),
+          longitude: Number(item.longitude),
+        }))
         setFactories(items)
       } catch {
         if (active) setFactories([])
@@ -868,7 +876,11 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
   }, [factories, selectedFactoryId, setSelectedFactoryId])
 
   useEffect(() => {
-    if (!mapContainerRef.current) return
+    if (!mapContainerRef.current) {
+      console.log('Map container ref not available')
+      return
+    }
+    console.log('Initializing map for city:', city)
     mapboxgl.accessToken = MAPBOX_TOKEN
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
@@ -878,9 +890,11 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
     })
     map.addControl(new mapboxgl.NavigationControl(), 'top-right')
     mapRef.current = map
+    console.log('Map initialized successfully')
 
     // Add heatmap source and layer when map loads
     map.on('load', () => {
+      console.log('Map loaded, adding heatmap source')
       map.addSource('pollution-heatmap', {
         type: 'geojson',
         data: {
@@ -911,6 +925,7 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
       })
 
       heatmapLayerRef.current = map.getLayer('heatmap-layer')
+      console.log('Heatmap layer added')
     })
 
     return () => {
@@ -922,12 +937,20 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
+    if (!map) {
+      console.log('Map not available for markers')
+      return
+    }
+    console.log('Adding markers for', factories.length, 'factories')
 
     markersRef.current.forEach((marker) => marker.remove())
     markersRef.current = []
 
-    factories.forEach((factory) => {
+    factories.forEach((factory, index) => {
+      if (!factory.latitude || !factory.longitude) {
+        console.log('Factory', index, 'missing coordinates:', factory.factory_id)
+        return
+      }
       const el = document.createElement('div')
       el.className = 'marker-container'
       const colorClass = getMarkerColorClass(factory.pollution_score)
@@ -949,14 +972,24 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
         </div>
       `
       
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([factory.longitude, factory.latitude])
-        .setPopup(new mapboxgl.Popup({ offset: 15 }).setHTML(popupHtml))
-        .addTo(map)
+      try {
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([factory.longitude, factory.latitude])
+          .setPopup(new mapboxgl.Popup({ offset: 15 }).setHTML(popupHtml))
+          .addTo(map)
 
-      el.addEventListener('click', () => setSelectedFactoryId(factory.factory_id))
-      markersRef.current.push(marker)
+        // Use marker element for click handling
+        marker.getElement().addEventListener('click', (e) => {
+          e.stopPropagation()
+          console.log('Marker clicked:', factory.factory_id)
+          setSelectedFactoryId(factory.factory_id)
+        })
+        markersRef.current.push(marker)
+      } catch (err) {
+        console.error('Error adding marker for factory', factory.factory_id, err)
+      }
     })
+    console.log('Added', markersRef.current.length, 'markers')
   }, [factories, setSelectedFactoryId])
 
   // Update heatmap data when it changes
@@ -996,6 +1029,10 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
       
       {loading && <p style={{ color: '#718096', marginBottom: '1rem' }}>Loading factories...</p>}
       
+      {!loading && factories.length === 0 && (
+        <p style={{ color: '#E53E3E', marginBottom: '1rem' }}>No factories found for {city}</p>
+      )}
+      
       {!loading && factories.length > 0 && (
         <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
           <div style={{ fontSize: '0.875rem', color: '#4A5568' }}>
@@ -1003,6 +1040,9 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
           </div>
           <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '0.25rem' }}>
             {selectedFactory?.industry_type} • Risk: {selectedFactory?.risk_level || 'N/A'}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#718096' }}>
+            ID: {selectedFactoryId || 'none'} | Factories: {factories.length}
           </div>
         </div>
       )}
@@ -1014,7 +1054,10 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
       <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
         <button 
           className="cta-button" 
-          onClick={handleViewDetails}
+          onClick={() => {
+            console.log('Button clicked, selectedFactoryId:', selectedFactoryId)
+            handleViewDetails()
+          }}
           disabled={!selectedFactoryId}
           style={{ opacity: selectedFactoryId ? 1 : 0.5 }}
         >
@@ -1163,16 +1206,44 @@ function AIScorePage({ factories, selectedFactoryId }) {
 function SolutionView({ factories, selectedFactoryId }) {
   const { goBack, goNext, canGoBack } = useFlowNavigation()
   const factory = factories.find((item) => item.factory_id === selectedFactoryId) || factories[0]
+  const [recommendations, setRecommendations] = useState([])
+  const [loadingRecs, setLoadingRecs] = useState(true)
+  
+  useEffect(() => {
+    async function fetchRecommendations() {
+      if (!factory) return
+      setLoadingRecs(true)
+      try {
+        const response = await fetch(`${API_BASE_URL}/recommendations?city=${factory.city}&page_size=200`)
+        if (response.ok) {
+          const data = await response.json()
+          const factoryRec = data.data?.find(r => r.factory_id === factory.factory_id)
+          if (factoryRec) {
+            setRecommendations([{
+              title: factoryRec.summary || 'AI-Generated Recommendation',
+              desc: factoryRec.summary || 'Based on ML analysis of pollution data',
+              risk_level: factoryRec.risk_level,
+              composite_score: factoryRec.composite_score,
+              dominant_pollutant: factoryRec.dominant_pollutant
+            }])
+          } else {
+            setRecommendations([])
+          }
+        }
+      } catch (err) {
+        console.error('Recommendations fetch failed:', err)
+        setRecommendations([])
+      } finally {
+        setLoadingRecs(false)
+      }
+    }
+    fetchRecommendations()
+  }, [factory])
   
   if (!factory) {
     return <Navigate to="/map" replace />
   }
   
-  const suggestions = (factory.recommendation || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-
   const defaultSolutions = [
     { title: 'Install scrubber systems', desc: 'Advanced wet scrubbers can remove 95%+ of particulate matter' },
     { title: 'Upgrade filtration units', desc: 'HEPA and activated carbon filters for toxic gas removal' },
@@ -1180,15 +1251,27 @@ function SolutionView({ factories, selectedFactoryId }) {
     { title: 'Real-time monitoring', desc: 'IoT sensors with AI analytics for emission tracking' },
   ]
 
-  const solutionList = suggestions.length 
-    ? suggestions.map((s, i) => ({ title: s, desc: 'AI-recommended improvement' }))
-    : defaultSolutions
+  const solutionList = recommendations.length > 0 ? recommendations : defaultSolutions
 
   return (
     <div className="floating-content">
       <div className="section-label">Step 7 / 7</div>
       <h1 className="page-title">Recommended Solutions</h1>
       <p className="page-subtitle">AI-generated recommendations for {factory.factory_name}</p>
+      
+      {loadingRecs && <p style={{ color: '#718096', marginBottom: '1rem' }}>Loading AI recommendations...</p>}
+      
+      {recommendations.length > 0 && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
+          <div style={{ fontSize: '0.875rem', color: '#4A5568' }}>
+            <strong>Risk Level:</strong> <span className={`badge ${recommendations[0].risk_level?.toLowerCase()}`}>{recommendations[0].risk_level}</span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '0.25rem' }}>
+            <strong>Composite Score:</strong> {recommendations[0].composite_score?.toFixed(2)} | 
+            <strong>Dominant Pollutant:</strong> {recommendations[0].dominant_pollutant?.toUpperCase()}
+          </div>
+        </div>
+      )}
       
       <ul className="solution-list">
         {solutionList.map((solution, idx) => (
@@ -1257,17 +1340,9 @@ function AppShell() {
   const { loading, factories } = useFactoryData(city)
   
   const [showLoading, setShowLoading] = useState(true)
-  const [showSolutionSmoke, setShowSolutionSmoke] = useState(false)
 
   const routeIndex = Math.max(0, ROUTE_ORDER.indexOf(location.pathname))
   const isClean = routeIndex >= 8
-  
-  // Handle solution page smoke animation
-  useEffect(() => {
-    if (location.pathname === '/solutions') {
-      setShowSolutionSmoke(true)
-    }
-  }, [location.pathname])
 
   return (
     <>
@@ -1275,15 +1350,7 @@ function AppShell() {
       {showLoading && (
         <SmokeLoadingScreen onComplete={() => setShowLoading(false)} />
       )}
-      
-      {/* Solution screen smoke closing animation */}
-      {showSolutionSmoke && (
-        <SmokeLoadingScreen 
-          isClosing={true}
-          onComplete={() => setShowSolutionSmoke(false)} 
-        />
-      )}
-      
+
       {!showLoading && (
         <>
           <SVGScene isClean={isClean} />

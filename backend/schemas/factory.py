@@ -76,4 +76,4 @@ class FactoryListResponse(BaseModel):
     total: int = Field(description="Total matching records (before pagination)")
     page: int = Field(description="Current page number (1-indexed)")
     page_size: int = Field(description="Records per page")
-    data: List[FactoryBase]
+    data: List[FactoryDetail]
