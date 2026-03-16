@@ -46,7 +46,11 @@ def run_factory_pipeline(config: Dict[str, Any] | None = None) -> pd.DataFrame:
     synthetic_fallback = bool(pipeline_cfg.get("synthetic_fallback", True))
     if raw_df.empty and synthetic_fallback:
         LOGGER.warning("Overpass data collection failed; switching to synthetic fallback dataset")
-        synthetic_df = SyntheticFactoryGenerator().generate(n_per_city=max(4, int(100 / max(len(TARGET_CITIES), 1))))
+        num_cities = max(len(cities), 1)
+        synthetic_df = SyntheticFactoryGenerator().generate(
+            n_per_city=max(4, int(100 / num_cities))
+        )
+        synthetic_df = synthetic_df[synthetic_df["city"].isin(cities)]
         raw_df = synthetic_df[["osm_id", "factory_name", "industry_type", "latitude", "longitude", "city"]].copy()
         raw_df["raw_tags"] = "{}"
 
@@ -58,7 +62,11 @@ def run_factory_pipeline(config: Dict[str, Any] | None = None) -> pd.DataFrame:
     cleaned_df = cleaner.clean(raw_df)
     if cleaned_df.empty and synthetic_fallback:
         LOGGER.warning("Cleaned data below threshold; generating synthetic fallback")
-        generated = SyntheticFactoryGenerator().generate(n_per_city=max(4, int(100 / max(len(TARGET_CITIES), 1))))
+        num_cities = max(len(cities), 1)
+        generated = SyntheticFactoryGenerator().generate(
+            n_per_city=max(4, int(100 / num_cities))
+        )
+        generated = generated[generated["city"].isin(cities)]
         cleaned_df = generated[
             [
                 "factory_id",
@@ -77,8 +85,10 @@ def run_factory_pipeline(config: Dict[str, Any] | None = None) -> pd.DataFrame:
 
     if len(cleaned_df) < min_threshold and synthetic_fallback:
         LOGGER.warning("Collected rows (%s) below threshold (%s); augmenting with synthetic data", len(cleaned_df), min_threshold)
-        n_per_city = max(4, int((min_threshold - len(cleaned_df)) / max(len(TARGET_CITIES), 1)) + 1)
+        num_cities = max(len(cities), 1)
+        n_per_city = max(4, int((min_threshold - len(cleaned_df)) / num_cities) + 1)
         generated = SyntheticFactoryGenerator().generate(n_per_city=n_per_city)
+        generated = generated[generated["city"].isin(cities)]
         generated_clean = generated[
             [
                 "factory_id",
@@ -112,13 +122,16 @@ def run_factory_pipeline(config: Dict[str, Any] | None = None) -> pd.DataFrame:
     LOGGER.info("Processed data saved: %s records", len(processed_df))
 
     industry_types = sorted({str(value) for value in processed_df.get("industry_type", pd.Series(dtype=str)).dropna().tolist()})
-    print("✅ Pipeline complete")
-    print(f"📍 Raw records collected: {len(raw_df)}")
-    print(f"🧹 After cleaning: {len(cleaned_df)}")
-    print(f"🏭 Processed records: {len(processed_df)}")
-    print(f"🏙️  Cities covered: {processed_df.get('city', pd.Series(dtype=str)).nunique() if not processed_df.empty else 0}")
-    print(f"🏗️  Industry types found: {industry_types}")
-    print(f"📁 Output: {clean_path.as_posix()}")
+    LOGGER.info("Pipeline complete")
+    LOGGER.info("Raw records collected: %s", len(raw_df))
+    LOGGER.info("After cleaning: %s", len(cleaned_df))
+    LOGGER.info("Processed records: %s", len(processed_df))
+    LOGGER.info(
+        "Cities covered: %s",
+        processed_df.get("city", pd.Series(dtype=str)).nunique() if not processed_df.empty else 0,
+    )
+    LOGGER.info("Industry types found: %s", industry_types)
+    LOGGER.info("Output: %s", clean_path.as_posix())
 
     return processed_df
 
@@ -129,4 +142,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    result = run_factory_pipeline()
+    print("✅ Pipeline complete")
+    print(f"🏭 Processed records: {len(result)}")
+    print("📁 Check data/raw/factories/factories.csv")

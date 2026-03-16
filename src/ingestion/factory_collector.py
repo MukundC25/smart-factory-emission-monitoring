@@ -114,13 +114,17 @@ class OverpassFactoryCollector:
         self._last_geocode_time = 0.0
         self._last_context: Tuple[str, str] = ("", "")
         self._geocoder = Nominatim(user_agent="smart_factory_osm_collector")
+        self.user_agent = pipeline_cfg.get(
+            "overpass_user_agent",
+            "factory-emission-monitor/1.0 (contact: admin@example.com)",
+        )
 
     def build_overpass_query(self, city: str, query_type: str, radius_km: int = 25) -> str:
         """Build Overpass QL query for one city and one query type."""
         lat, lon = self.geocode_city(city)
         radius_m = radius_km * 1000
         return (
-            "[out:json][timeout:60];\n"
+            f"[out:json][timeout:{self.timeout}];\n"
             "(\n"
             f"  node{query_type}(around:{radius_m},{lat},{lon});\n"
             f"  way{query_type}(around:{radius_m},{lat},{lon});\n"
@@ -133,6 +137,12 @@ class OverpassFactoryCollector:
         """Resolve city coordinates via cache, Nominatim, then hardcoded fallback."""
         if city in self.city_cache:
             return self.city_cache[city]
+
+        # Check hardcoded map first to avoid unnecessary external API calls.
+        coords = CITY_COORDINATES.get(city)
+        if coords is not None:
+            self.city_cache[city] = coords
+            return coords
 
         now = time.time()
         elapsed = now - self._last_geocode_time
@@ -149,11 +159,7 @@ class OverpassFactoryCollector:
         except (GeocoderTimedOut, GeocoderServiceError) as exc:
             LOGGER.warning("Geocode failed for %s: %s", city, exc)
 
-        coords = CITY_COORDINATES.get(city)
-        if coords is None:
-            raise ValueError(f"No coordinates available for city: {city}")
-        self.city_cache[city] = coords
-        return coords
+        raise ValueError(f"No coordinates available for city: {city}")
 
     def fetch_overpass(self, query: str, retries: int = 3) -> Dict[str, Any]:
         """Execute Overpass query with retry/backoff behavior."""
@@ -174,10 +180,18 @@ class OverpassFactoryCollector:
                     self.overpass_url,
                     data={"data": query},
                     timeout=self.timeout,
+                    headers={"User-Agent": self.user_agent},
                 )
                 if response.status_code == 429:
-                    LOGGER.warning("Overpass 429 for city=%s query=%s; waiting 30 seconds", city, query_name)
-                    time.sleep(30)
+                    retry_after_header = response.headers.get("Retry-After")
+                    try:
+                        retry_after = int(retry_after_header) if retry_after_header else 30
+                    except (TypeError, ValueError):
+                        retry_after = 30
+                    LOGGER.warning(
+                        "Overpass 429 rate limit — waiting %ss before retry", retry_after
+                    )
+                    time.sleep(retry_after)
                     continue
                 response.raise_for_status()
                 payload = response.json()
@@ -210,10 +224,14 @@ class OverpassFactoryCollector:
             self._last_context = (city, spec.name)
             payload = self.fetch_overpass(query=query, retries=self.retries)
             for element in payload.get("elements", []):
-                osm_id = str(element.get("id", ""))
-                if not osm_id or osm_id in seen_ids:
+                osm_type = element.get("type", "")
+                osm_local_id = element.get("id")
+                if osm_local_id is None:
                     continue
-                seen_ids.add(osm_id)
+                composite_id = f"{osm_type}/{osm_local_id}" if osm_type else str(osm_local_id)
+                if composite_id in seen_ids:
+                    continue
+                seen_ids.add(composite_id)
                 enriched = dict(element)
                 enriched["_query_type"] = spec.name
                 collected.append(enriched)
@@ -252,7 +270,9 @@ class OverpassFactoryCollector:
     def parse_element(self, element: Dict[str, Any], city: str) -> Optional[Dict[str, Any]]:
         """Convert one OSM element into a normalized record."""
         tags = element.get("tags", {}) if isinstance(element.get("tags", {}), dict) else {}
-        osm_id = str(element.get("id", ""))
+        raw_id = element.get("id", "")
+        elem_type = str(element.get("type", "")).strip()
+        osm_id = f"{elem_type}/{raw_id}" if elem_type and raw_id != "" else str(raw_id)
 
         latitude = element.get("lat")
         longitude = element.get("lon")

@@ -111,6 +111,7 @@ recommendations:
   rule_weight: 0.7
   ml_weight: 0.3
   confidence_threshold: 0.4
+  # Used by recommendation engine for station-to-factory matching
   max_station_distance_km: 100
   output_csv: data/output/recommendations_reports.csv
   output_json: data/output/recommendations.json
@@ -130,10 +131,10 @@ factory_pipeline:
     - Surat
     - Nagpur
   overpass_url: https://overpass-api.de/api/interpreter
+  overpass_user_agent: "factory-emission-monitor/1.0 (contact: admin@example.com)"
   overpass_timeout: 60
   overpass_retries: 3
   city_delay_seconds: 2
-  max_station_distance_km: 50
   dbscan_eps: 0.05
   dbscan_min_samples: 2
   min_factories_threshold: 50

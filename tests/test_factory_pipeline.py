@@ -8,7 +8,7 @@ from src.ingestion.factory_collector import OverpassFactoryCollector
 from src.ingestion.factory_data_cleaner import FactoryDataCleaner
 from src.ingestion.factory_processor import FactoryProcessor
 from src.ingestion.run_factory_pipeline import run_factory_pipeline
-from src.ingestion.synthetic_factory_generator import SyntheticFactoryGenerator
+from src.ingestion.synthetic_factory_generator import SyntheticFactoryGenerator, TARGET_CITIES
 
 
 def _collector() -> OverpassFactoryCollector:
@@ -128,9 +128,10 @@ def test_final_schema_has_correct_columns() -> None:
 
 
 def test_synthetic_generator_produces_min_records() -> None:
+    n_per_city = 4
     generator = SyntheticFactoryGenerator()
-    df = generator.generate(n_per_city=4)
-    assert len(df) >= 100
+    df = generator.generate(n_per_city=n_per_city)
+    assert len(df) == n_per_city * len(TARGET_CITIES)
 
 
 def test_pipeline_does_not_crash_on_empty_overpass_response(monkeypatch, tmp_path) -> None:
