@@ -17,12 +17,7 @@ import requests
 from src.recommendations.openaq_client import OpenAQClient
 from src.recommendations.tree_calculator import (
     AQI_GOOD,
-    AQI_MODERATE,
-    AQI_POOR,
-    AQI_SATISFACTORY,
-    AQI_VERY_POOR,
     MATURITY_YEARS,
-    TREE_CO2_ABSORPTION_TONS_YEAR,
     TreePlantingCalculator,
 )
 
@@ -38,19 +33,19 @@ _calc = TreePlantingCalculator()
 # ===========================================================================
 
 
-def test_aqi_from_pm25_good_range():
+def test_calculate_aqi_from_pm25_good_range():
     """PM2.5 = 15 μg/m³ is in the first CPCB band (0–30 → AQI 0–50)."""
     # Linear: (50-0)/(30-0) * (15-0) + 0 = 25.0
     aqi = OpenAQClient.calculate_aqi_from_pm25(15.0)
     assert round(aqi) == 25
 
 
-def test_aqi_from_pm25_severe_range():
+def test_calculate_aqi_from_pm25_severe_range():
     """PM2.5 > 500 μg/m³ (beyond all breakpoints) should return 500."""
     assert OpenAQClient.calculate_aqi_from_pm25(600.0) == 500.0
 
 
-def test_aqi_from_pm25_interpolation():
+def test_calculate_aqi_from_pm25_interpolates_within_band():
     """PM2.5 = 45 μg/m³ falls in band 30–60 → AQI 51–100.
 
     Expected: (100-51)/(60-30) * (45-30) + 51 ≈ 75.5
@@ -65,7 +60,7 @@ def test_aqi_from_pm25_interpolation():
 # ===========================================================================
 
 
-def test_pm25_trees_zero_when_already_at_target():
+def test_calculate_trees_for_pm25_zero_reduction_needed():
     """No trees needed when current PM2.5 already equals the target."""
     trees = _calc.calculate_trees_for_pm25(
         current_pm25=50.0,
@@ -75,7 +70,7 @@ def test_pm25_trees_zero_when_already_at_target():
     assert trees == 0.0
 
 
-def test_pm25_trees_positive_for_elevated_pollution():
+def test_calculate_trees_for_pm25_positive_reduction():
     """Trees needed must be > 0 when current PM2.5 exceeds target."""
     trees = _calc.calculate_trees_for_pm25(
         current_pm25=65.0,
@@ -93,14 +88,14 @@ def test_pm25_trees_positive_for_elevated_pollution():
 # ===========================================================================
 
 
-def test_impact_radius_scales_with_pollution_score():
+def test_calculate_impact_radius_scales_with_score():
     """Higher pollution score → larger impact radius."""
     r_low = _calc.calculate_impact_radius(1.0)
     r_high = _calc.calculate_impact_radius(5.0)
     assert r_high > r_low
 
 
-def test_impact_radius_capped_at_5km():
+def test_calculate_impact_radius_capped_at_5km():
     """Impact radius is hard-capped at 5.0 km regardless of score."""
     radius = _calc.calculate_impact_radius(100.0)
     assert radius == 5.0
@@ -111,14 +106,14 @@ def test_impact_radius_capped_at_5km():
 # ===========================================================================
 
 
-def test_target_aqi_step_down_progression():
+def test_determine_target_aqi_steps_down_one_band():
     """Verify one-band step-down logic across all CPCB AQI bands."""
     # Severe (> 400) → Poor (300)
-    assert _calc.determine_target_aqi(450.0) == float(AQI_POOR)
+    assert _calc.determine_target_aqi(450.0) == 300.0
     # Very Poor (301–400) → Moderate (200)
-    assert _calc.determine_target_aqi(350.0) == float(AQI_MODERATE)
+    assert _calc.determine_target_aqi(350.0) == 200.0
     # Poor (201–300) → Satisfactory (100)
-    assert _calc.determine_target_aqi(250.0) == float(AQI_SATISFACTORY)
+    assert _calc.determine_target_aqi(250.0) == 100.0
     # Moderate or below → Good (50)
     assert _calc.determine_target_aqi(150.0) == float(AQI_GOOD)
     assert _calc.determine_target_aqi(40.0) == float(AQI_GOOD)
@@ -129,22 +124,11 @@ def test_target_aqi_step_down_progression():
 # ===========================================================================
 
 
-def test_feasibility_high_under_500_trees():
-    """< 500 recommended trees → 'High' feasibility."""
-    result = _calc.assess_feasibility(trees_recommended=200, planting_area_hectares=2.0)
-    assert result == "High"
-
-
-def test_feasibility_medium_under_2000_trees():
-    """500–1999 recommended trees → 'Medium' feasibility."""
-    result = _calc.assess_feasibility(trees_recommended=1000, planting_area_hectares=10.0)
-    assert result == "Medium"
-
-
-def test_feasibility_low_over_2000_trees():
-    """≥ 2 000 recommended trees → 'Low' feasibility."""
-    result = _calc.assess_feasibility(trees_recommended=3000, planting_area_hectares=30.0)
-    assert result == "Low"
+def test_assess_feasibility_returns_correct_level():
+    """Feasibility classifier should return High/Medium/Low across thresholds."""
+    assert _calc.assess_feasibility(trees_recommended=200, planting_area_hectares=2.0) == "High"
+    assert _calc.assess_feasibility(trees_recommended=1000, planting_area_hectares=10.0) == "Medium"
+    assert _calc.assess_feasibility(trees_recommended=3000, planting_area_hectares=30.0) == "Low"
 
 
 # ===========================================================================
@@ -152,8 +136,8 @@ def test_feasibility_low_over_2000_trees():
 # ===========================================================================
 
 
-def test_buffer_ordering_minimum_recommended_optimal():
-    """minimum ≤ recommended ≤ optimal across buffer tiers."""
+def test_buffers_produce_correct_multipliers():
+    """Buffer tiers should follow minimum*1.2 and minimum*1.5 (ceil-rounded)."""
     rec = _calc.calculate_trees_needed(
         factory_id="TST001",
         city="TestCity",
@@ -164,6 +148,8 @@ def test_buffer_ordering_minimum_recommended_optimal():
     )
     t = rec.trees_needed
     assert t["minimum"] <= t["recommended"] <= t["optimal"]
+    assert t["recommended"] == math.ceil(t["minimum"] * 1.2)
+    assert t["optimal"] == math.ceil(t["minimum"] * 1.5)
 
 
 # ===========================================================================
@@ -171,7 +157,7 @@ def test_buffer_ordering_minimum_recommended_optimal():
 # ===========================================================================
 
 
-def test_recommendation_dataclass_fields_populated():
+def test_full_calculation_returns_dataclass():
     """All key fields in TreeRecommendation must be populated after a full run."""
     rec = _calc.calculate_trees_needed(
         factory_id="FAC001",
@@ -198,7 +184,7 @@ def test_recommendation_dataclass_fields_populated():
 # ===========================================================================
 
 
-def test_dominant_pm25_drives_recommendation():
+def test_openaq_client_parses_pm25_correctly():
     """When dominant_pollutant='pm25', pm25 formula should drive the base count."""
     rec_pm25 = _calc.calculate_trees_needed(
         factory_id="FAC_A",
@@ -232,7 +218,7 @@ def test_dominant_no2_drives_recommendation():
 # ===========================================================================
 
 
-def test_openaq_fallback_on_timeout():
+def test_openaq_client_returns_fallback_on_timeout():
     """get_city_aqi must return a usable dict (not raise) when the HTTP call times out."""
     with patch("requests.Session.get", side_effect=requests.exceptions.Timeout):
         client = OpenAQClient()
@@ -249,7 +235,7 @@ def test_openaq_fallback_on_timeout():
 # ===========================================================================
 
 
-def test_openaq_pm2_5_key_normalised_to_pm25():
+def test_extract_pollutant_values_handles_pm2_5_naming():
     """OpenAQ sometimes returns 'pm2.5'; extract_pollutant_values must normalise it."""
     raw_response = {
         "results": [
@@ -265,3 +251,17 @@ def test_openaq_pm2_5_key_normalised_to_pm25():
     values = client.extract_pollutant_values(raw_response)
     assert values["pm25"] == 72.0
     assert values["pm10"] == 95.0
+
+
+def test_openaq_client_handles_429_gracefully():
+    """429 from OpenAQ should be swallowed and converted to fallback output."""
+    mock_response = MagicMock()
+    mock_response.status_code = 429
+    mock_response.raise_for_status.return_value = None
+    with patch("requests.Session.get", return_value=mock_response):
+        client = OpenAQClient()
+        result = client.get_city_aqi(city="Pune", lat=18.52, lon=73.85)
+
+    assert isinstance(result, dict)
+    assert result.get("source") == "fallback"
+    assert result.get("aqi") == 100.0

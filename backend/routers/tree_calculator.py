@@ -21,6 +21,7 @@ from backend.schemas.tree_calculator import (
     PollutantReadings,
     TreeCalculatorBulkRequest,
     TreeCalculatorBulkResponse,
+    TreeCalculatorConstantsResponse,
     TreeRecommendationResponse,
     TreesNeeded,
 )
@@ -393,9 +394,10 @@ async def get_bulk_tree_recommendations(
 
 @router.get(
     "/tree-calculator/constants",
+    response_model=TreeCalculatorConstantsResponse,
     summary="Get scientific constants used in tree calculations",
 )
-def get_calculator_constants() -> dict:
+def get_calculator_constants() -> TreeCalculatorConstantsResponse:
     """Return all constants used by :class:`TreePlantingCalculator`.
 
     Intended for frontend methodology transparency and documentation.

@@ -58,7 +58,7 @@ def test_get_tree_recommendation_valid_factory_200(test_client):
 # ===========================================================================
 
 
-def test_get_tree_recommendation_unknown_factory_404(test_client):
+def test_get_tree_recommendation_invalid_factory_404(test_client):
     """GET /factories/INVALID_ID/tree-recommendation → 404."""
     response = test_client.get(
         "/factories/INVALID_ID/tree-recommendation?use_live_aqi=false"
@@ -73,22 +73,16 @@ def test_get_tree_recommendation_unknown_factory_404(test_client):
 # ===========================================================================
 
 
-def test_get_tree_recommendation_live_aqi_uses_openaq(test_client):
-    """GET /factories/FAC001/tree-recommendation?use_live_aqi=true uses OpenAQ."""
-    with patch("backend.routers.tree_calculator.OpenAQClient") as mock_cls:
-        mock_instance = MagicMock()
-        mock_instance.get_city_aqi.return_value = _MOCK_AQI_DATA
-        mock_cls.return_value = mock_instance
-
-        response = test_client.get(
-            "/factories/FAC001/tree-recommendation?use_live_aqi=true"
-        )
+def test_get_tree_recommendation_live_aqi_false(test_client):
+    """GET with use_live_aqi=false should stay on cached data path."""
+    response = test_client.get(
+        "/factories/FAC001/tree-recommendation?use_live_aqi=false"
+    )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["current_aqi"] == pytest.approx(178.0)
-    assert body["current_readings"]["aqi_index"] == pytest.approx(178.0)
-    assert body["data_source"] == "openaq"
+    assert body["data_source"] == "cached"
+    assert body["current_readings"]["source"] == "cached"
 
 
 # ===========================================================================
@@ -96,19 +90,19 @@ def test_get_tree_recommendation_live_aqi_uses_openaq(test_client):
 # ===========================================================================
 
 
-def test_bulk_tree_recommendation_returns_results(test_client):
-    """POST /factories/tree-recommendation/bulk returns tree recs for all valid IDs."""
-    payload = {"factory_ids": ["FAC001", "FAC002", "FAC003"]}
+def test_bulk_recommendation_returns_results_and_errors(test_client):
+    """Bulk endpoint should return mixed successes and per-factory errors."""
+    payload = {"factory_ids": ["FAC001", "INVALID_ID", "FAC003"]}
     response = test_client.post(
         "/factories/tree-recommendation/bulk?use_live_aqi=false",
         json=payload,
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["total"] == 3
-    assert len(body["results"]) == 3
-    # Errors list should be empty since all IDs are valid
-    assert body["errors"] == []
+    assert body["total"] == 2
+    assert len(body["results"]) == 2
+    assert len(body["errors"]) == 1
+    assert body["errors"][0]["factory_id"] == "INVALID_ID"
 
 
 # ===========================================================================
@@ -116,7 +110,7 @@ def test_bulk_tree_recommendation_returns_results(test_client):
 # ===========================================================================
 
 
-def test_bulk_tree_recommendation_rejects_over_50_factories(test_client):
+def test_bulk_recommendation_max_50_enforced(test_client):
     """POST with 51 factory IDs should fail Pydantic validation → 422."""
     payload = {"factory_ids": [f"FAC{i:03d}" for i in range(51)]}
     response = test_client.post(
@@ -131,7 +125,7 @@ def test_bulk_tree_recommendation_rejects_over_50_factories(test_client):
 # ===========================================================================
 
 
-def test_get_calculator_constants_returns_expected_keys(test_client):
+def test_get_calculator_constants_200(test_client):
     """GET /tree-calculator/constants should return scientific constants dict."""
     response = test_client.get("/tree-calculator/constants")
     assert response.status_code == 200

@@ -206,7 +206,7 @@ def root() -> dict:
     return {
         "name": "Smart Factory Emission Monitoring API",
         "version": "2.0.0",
-        "description": "Recommendations endpoints: /recommendations, /recommendations/stats, /recommendations/{factory_id}, /recommendations/generate",
+        "description": "Recommendations endpoints: /recommendations, /recommendations/stats, /recommendations/{factory_id}, /recommendations/generate. Tree calculator endpoints: /factories/{factory_id}/tree-recommendation, /factories/tree-recommendation/bulk, /tree-calculator/constants",
         "endpoints": [
             "GET /factories            — paginated factory list with filters",
             "GET /factory/{id}         — factory detail with risk score & recommendations",
@@ -217,6 +217,9 @@ def root() -> dict:
             "GET /recommendations/{factory_id} — full recommendation report",
             "GET /recommendations/stats — recommendation aggregate stats",
             "POST /recommendations/generate — regenerate recommendations synchronously",
+            "GET /factories/{factory_id}/tree-recommendation — single-factory tree recommendation",
+            "POST /factories/tree-recommendation/bulk — bulk tree recommendations (max 50 IDs)",
+            "GET /tree-calculator/constants — constants and methodology reference",
             "GET /health               — health check (always 200)",
             "GET /docs                 — interactive Swagger UI",
             "GET /redoc                — ReDoc API reference",

@@ -97,9 +97,28 @@ class TreeCalculatorBulkRequest(BaseModel):
     ]
 
 
+class TreeCalculatorError(BaseModel):
+    """Error item for a failed factory in bulk calculation."""
+
+    factory_id: str
+    error: str
+
+
+class TreeCalculatorConstantsResponse(BaseModel):
+    """Structured response model for calculator constants endpoint."""
+
+    particulate_matter_absorption: dict[str, float]
+    carbon_absorption: dict[str, float]
+    physical_coverage: dict[str, float]
+    aqi_thresholds_cpcb_india: dict[str, float]
+    safety_buffers: dict[str, float]
+    aqi_reduction_per_1000_trees: dict[str, float]
+    tree_maturity: dict[str, float]
+
+
 class TreeCalculatorBulkResponse(BaseModel):
     """Bulk response containing per-factory recommendations and any errors."""
 
     total: int
     results: List[TreeRecommendationResponse]
-    errors: List[dict]  # {factory_id, error} for failed lookups
+    errors: List[TreeCalculatorError]
