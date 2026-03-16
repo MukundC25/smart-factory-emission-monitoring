@@ -60,7 +60,10 @@ class FactoryProcessor:
         enriched = df.copy()
 
         def _risk(industry_type: str) -> str:
-            token = str(industry_type or "").lower()
+            if pd.isna(industry_type):
+                token = ""
+            else:
+                token = str(industry_type).lower()
             if token in self.HIGH_RISK:
                 return "High"
             if token in self.MEDIUM_RISK:

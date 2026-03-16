@@ -410,10 +410,14 @@ def collect_factory_data(config: Optional[Dict[str, Any]] = None) -> pd.DataFram
             ]
         ]
 
+    # Local import avoids circular dependency (factory_data_cleaner imports CITY_TO_STATE from here)
+    from src.ingestion.factory_data_cleaner import FactoryDataCleaner
+    cleaner = FactoryDataCleaner()
+    main_df = cleaner.clean(main_df)
     main_path = get_project_root() / _main_factory_path(runtime_config)
     main_path.parent.mkdir(parents=True, exist_ok=True)
     main_df.to_csv(main_path, index=False)
-    LOGGER.info("Factory datasets written: raw=%s rows, clean=%s rows", len(raw_df), len(main_df))
+    LOGGER.info("Factory datasets written: raw=%s rows, main=%s rows", len(raw_df), len(main_df))
     return main_df
 
 

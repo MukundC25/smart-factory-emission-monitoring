@@ -61,7 +61,7 @@ def run_factory_pipeline(config: Dict[str, Any] | None = None) -> pd.DataFrame:
     cleaner = FactoryDataCleaner()
     cleaned_df = cleaner.clean(raw_df)
     if cleaned_df.empty and synthetic_fallback:
-        LOGGER.warning("Cleaned data below threshold; generating synthetic fallback")
+        LOGGER.warning("Cleaned data is empty after cleaning; generating synthetic fallback dataset")
         num_cities = max(len(cities), 1)
         generated = SyntheticFactoryGenerator().generate(
             n_per_city=max(4, int(100 / num_cities))
