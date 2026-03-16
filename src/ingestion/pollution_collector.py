@@ -80,7 +80,8 @@ _KAGGLE_COL_MAP = {
 
 
 def _load_factories(config: Dict[str, Any]) -> pd.DataFrame:
-    path = get_project_root() / config["paths"]["factories_raw"]
+    factories_rel = config["paths"].get("factories_clean") or config["paths"]["factories_raw"]
+    path = get_project_root() / factories_rel
     if not path.exists():
         raise FileNotFoundError(f"Factory dataset not found at {path}")
     return pd.read_csv(path)

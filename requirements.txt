@@ -1,6 +1,8 @@
 python-dotenv==1.0.1
 PyYAML==6.0.2
 requests==2.32.3
+overpy==0.7
+geopy==2.4.1
 beautifulsoup4==4.12.3
 pandas==2.2.3
 numpy==2.1.3

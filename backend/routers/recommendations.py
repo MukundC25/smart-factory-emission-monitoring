@@ -195,7 +195,8 @@ def generate_recommendations(loader: DataLoader = Depends(get_data_loader)) -> R
     config = initialize_environment()
     root = get_project_root()
 
-    factories_df = pd.read_csv(root / config["paths"]["factories_raw"])
+    factories_rel = config["paths"].get("factories_clean") or config["paths"]["factories_raw"]
+    factories_df = pd.read_csv(root / factories_rel)
     pollution_df = pd.read_csv(root / config["paths"]["pollution_processed"])
 
     if factories_df.empty or pollution_df.empty:

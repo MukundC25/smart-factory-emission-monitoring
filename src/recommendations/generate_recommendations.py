@@ -82,7 +82,8 @@ def run(config: Optional[Dict[str, Any]] = None) -> int:
 
     try:
         LOGGER.info("Step 1/7: Resolving paths from config")
-        factories_path = root / runtime_config["paths"]["factories_raw"]
+        factories_rel = runtime_config["paths"].get("factories_clean") or runtime_config["paths"]["factories_raw"]
+        factories_path = root / factories_rel
         pollution_path = root / runtime_config["paths"]["pollution_processed"]
         csv_output_path, json_output_path = _resolve_output_paths(runtime_config)
         LOGGER.info("Factories path: %s", factories_path)
