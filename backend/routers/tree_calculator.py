@@ -90,6 +90,7 @@ def _score_to_concentration(score: Optional[float], pollutant: str) -> Optional[
     return (value / 10.0) * max_conc
 
 _calculator = TreePlantingCalculator()
+_openaq_client = OpenAQClient()
 
 
 # ---------------------------------------------------------------------------
@@ -153,11 +154,10 @@ def _build_response(
 
 async def _fetch_aqi_live(city: str, lat: float, lon: float) -> dict:
     """Run the synchronous OpenAQ call in a thread executor with 8 s timeout."""
-    client = OpenAQClient()
     loop = asyncio.get_running_loop()
     try:
         aqi_data = await asyncio.wait_for(
-            loop.run_in_executor(None, client.get_city_aqi, city, lat, lon),
+            loop.run_in_executor(None, _openaq_client.get_city_aqi, city, lat, lon),
             timeout=8.0,
         )
         return aqi_data
