@@ -24,7 +24,7 @@ def _mock_factories_df() -> pd.DataFrame:
         {
             "factory_id": ["FAC001", "FAC002", "FAC003"],
             "factory_name": ["Pune Steel Works", "Mumbai Textiles", "Bengaluru Electronics"],
-            "industry_type": ["manufacturing", "textiles", "electronics"],
+            "industry_type": ["steel", "textiles", "electronics"],
             "latitude": [18.52, 19.07, 12.97],
             "longitude": [73.85, 72.87, 77.59],
             "city": ["Pune", "Mumbai", "Bengaluru"],
@@ -68,7 +68,7 @@ def _mock_recommendations_df() -> pd.DataFrame:
         {
             "factory_id": ["FAC001", "FAC002", "FAC003"],
             "factory_name": ["Pune Steel Works", "Mumbai Textiles", "Bengaluru Electronics"],
-            "industry_type": ["manufacturing", "textiles", "electronics"],
+            "industry_type": ["steel", "textiles", "electronics"],
             "latitude": [18.52, 19.07, 12.97],
             "longitude": [73.85, 72.87, 77.59],
             "city": ["Pune", "Mumbai", "Bengaluru"],
@@ -77,7 +77,7 @@ def _mock_recommendations_df() -> pd.DataFrame:
             "pollution_impact_score": [7.5, 4.2, 8.9],
             "latest_pm25": [45.2, 32.1, 78.5],
             "latest_pm10": [60.0, 42.0, 95.0],
-            "risk_level": ["High", "Low", "High"],
+            "risk_level": ["High", "Low", "Critical"],
             "recommendation": [
                 "Install scrubbers",
                 "Regular maintenance",
