@@ -107,15 +107,6 @@ heatmap:
     "0.8": "#FF0000"
     "1.0": "#800080"
 
-tree_calculator:
-  openaq_base_url: "https://api.openaq.org/v2"
-  openaq_timeout: 10
-  openaq_radius_m: 10000
-  max_bulk_factories: 50
-  default_target_aqi: 100
-  tree_maturity_years: 5
-  trees_per_hectare: 1000
-
 recommendations:
   rule_weight: 0.7
   ml_weight: 0.3
