@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
@@ -18,14 +19,17 @@ RECOMMENDATIONS_JSON = ROOT / "data" / "output" / "recommendations.json"
 RECOMMENDATIONS_CSV = ROOT / "data" / "output" / "recommendations.csv"
 
 
+@lru_cache(maxsize=1)
 def _factories() -> pd.DataFrame:
     return pd.read_csv(FACTORIES_CSV)
 
 
+@lru_cache(maxsize=1)
 def _pollution() -> pd.DataFrame:
     return pd.read_csv(POLLUTION_CSV)
 
 
+@lru_cache(maxsize=1)
 def _reports() -> list[dict]:
     payload = json.loads(RECOMMENDATIONS_JSON.read_text(encoding="utf-8"))
     return list(payload.get("reports", []))
