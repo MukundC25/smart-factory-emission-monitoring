@@ -69,6 +69,23 @@ def test_rule_engine_high_so2_returns_scrubber_recommendation() -> None:
     assert any("flue gas desulfurization" in rec.action.lower() or "wet scrubber" in rec.action.lower() for rec in recs)
 
 
+def test_apply_rules_high_so2_recommendation_is_immediate_priority() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 9.0,
+            "pm25_score": 0.0,
+            "pm10_score": 0.0,
+            "no2_score": 0.0,
+            "co_score": 0.0,
+            "o3_score": 0.0,
+            "composite_score": 7.0,
+            "risk_level": "High",
+            "industry_type": "steel",
+        }
+    )
+    assert any(rec.priority == "Immediate" and "scrubber" in rec.action.lower() for rec in recs)
+
+
 def test_rule_engine_high_pm_returns_filter_recommendation() -> None:
     """High PM should trigger bag filter recommendation."""
     engine = RuleEngine()
@@ -87,6 +104,125 @@ def test_rule_engine_high_pm_returns_filter_recommendation() -> None:
     )
 
     assert any("bag filter" in rec.action.lower() or "fabric filter" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_high_pm10_returns_cyclone_separator() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 0.0,
+            "pm25_score": 2.0,
+            "pm10_score": 8.0,
+            "no2_score": 0.0,
+            "co_score": 0.0,
+            "o3_score": 0.0,
+            "composite_score": 6.0,
+            "risk_level": "Medium",
+            "industry_type": "cement",
+        }
+    )
+    assert any("cyclone separator" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_high_no2_returns_scr_recommendation() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 0.0,
+            "pm25_score": 0.0,
+            "pm10_score": 0.0,
+            "no2_score": 9.0,
+            "co_score": 0.0,
+            "o3_score": 0.0,
+            "composite_score": 6.5,
+            "risk_level": "High",
+            "industry_type": "power",
+        }
+    )
+    assert any("selective catalytic reduction" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_high_co_returns_combustion_optimization() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 0.0,
+            "pm25_score": 0.0,
+            "pm10_score": 0.0,
+            "no2_score": 0.0,
+            "co_score": 8.0,
+            "o3_score": 0.0,
+            "composite_score": 6.5,
+            "risk_level": "High",
+            "industry_type": "industrial",
+        }
+    )
+    assert any("air-fuel ratio" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_high_o3_returns_nox_reduction() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 0.0,
+            "pm25_score": 0.0,
+            "pm10_score": 0.0,
+            "no2_score": 0.0,
+            "co_score": 0.0,
+            "o3_score": 8.0,
+            "composite_score": 6.5,
+            "risk_level": "High",
+            "industry_type": "industrial",
+        }
+    )
+    assert any("nox" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_multi_pollutant_returns_audit_recommendation() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 7.0,
+            "pm25_score": 8.0,
+            "pm10_score": 1.0,
+            "no2_score": 1.0,
+            "co_score": 1.0,
+            "o3_score": 1.0,
+            "composite_score": 7.0,
+            "risk_level": "High",
+            "industry_type": "steel",
+        }
+    )
+    assert any("audit" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_medium_risk_returns_preventive_maintenance() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 2.0,
+            "pm25_score": 2.0,
+            "pm10_score": 2.0,
+            "no2_score": 2.0,
+            "co_score": 2.0,
+            "o3_score": 2.0,
+            "composite_score": 4.0,
+            "risk_level": "Medium",
+            "industry_type": "automotive",
+        }
+    )
+    assert any("preventive maintenance" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_low_risk_returns_compliance_review() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 1.0,
+            "pm25_score": 1.0,
+            "pm10_score": 1.0,
+            "no2_score": 1.0,
+            "co_score": 1.0,
+            "o3_score": 1.0,
+            "composite_score": 1.5,
+            "risk_level": "Low",
+            "industry_type": "industrial",
+        }
+    )
+    assert any("annual compliance review" in rec.action.lower() for rec in recs)
 
 
 def test_rule_engine_low_risk_returns_maintenance_recommendation() -> None:
@@ -127,6 +263,95 @@ def test_industry_specific_rules_steel() -> None:
     )
 
     assert any("slag handling" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_industry_chemical_returns_chemical_specific_rec() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 1.0,
+            "pm25_score": 1.0,
+            "pm10_score": 1.0,
+            "no2_score": 1.0,
+            "co_score": 1.0,
+            "o3_score": 1.0,
+            "composite_score": 2.0,
+            "risk_level": "Low",
+            "industry_type": "chemical",
+        }
+    )
+    assert any("voc" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_industry_power_returns_power_specific_rec() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 1.0,
+            "pm25_score": 1.0,
+            "pm10_score": 1.0,
+            "no2_score": 1.0,
+            "co_score": 1.0,
+            "o3_score": 1.0,
+            "composite_score": 2.0,
+            "risk_level": "Low",
+            "industry_type": "power",
+        }
+    )
+    assert any("carbon capture" in rec.action.lower() for rec in recs)
+
+
+def test_apply_rules_returns_recommendation_dataclass_fields() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 8.0,
+            "pm25_score": 8.0,
+            "pm10_score": 8.0,
+            "no2_score": 8.0,
+            "co_score": 8.0,
+            "o3_score": 8.0,
+            "composite_score": 8.0,
+            "risk_level": "Critical",
+            "industry_type": "steel",
+        }
+    )
+    assert recs
+    first = recs[0]
+    assert isinstance(first, Recommendation)
+    for field in ["category", "priority", "action", "pollutant", "estimated_reduction", "cost_category", "timeline"]:
+        assert hasattr(first, field)
+
+
+def test_apply_rules_zero_scores_does_not_crash() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": 0.0,
+            "pm25_score": 0.0,
+            "pm10_score": 0.0,
+            "no2_score": 0.0,
+            "co_score": 0.0,
+            "o3_score": 0.0,
+            "composite_score": 0.0,
+            "risk_level": "Low",
+            "industry_type": "steel",
+        }
+    )
+    assert isinstance(recs, list)
+
+
+def test_apply_rules_nan_scores_does_not_crash() -> None:
+    recs = RuleEngine().apply_rules(
+        {
+            "so2_score": float("nan"),
+            "pm25_score": float("nan"),
+            "pm10_score": float("nan"),
+            "no2_score": float("nan"),
+            "co_score": float("nan"),
+            "o3_score": float("nan"),
+            "composite_score": float("nan"),
+            "risk_level": "Unknown",
+            "industry_type": "steel",
+        }
+    )
+    assert isinstance(recs, list)
 
 
 def test_hybrid_engine_generates_report(

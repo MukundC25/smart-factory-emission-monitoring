@@ -163,3 +163,123 @@ def test_pipeline_does_not_crash_on_empty_overpass_response(monkeypatch, tmp_pat
 
     processed = run_factory_pipeline(config)
     assert not processed.empty
+
+
+def test_cleaner_normalize_osm_id_removes_slash() -> None:
+    cleaner = FactoryDataCleaner()
+    assert cleaner._normalize_osm_id("way/123") == "way_123"
+
+
+def test_cleaner_normalize_osm_id_none_returns_unknown() -> None:
+    cleaner = FactoryDataCleaner()
+    assert cleaner._normalize_osm_id(None) == "unknown"
+
+
+def test_cleaner_factory_id_has_no_slash() -> None:
+    cleaner = FactoryDataCleaner()
+    df = pd.DataFrame(
+        [
+            {"osm_id": "node/1001", "factory_name": "X", "industry_type": "steel", "latitude": 18.52, "longitude": 73.85, "city": "Pune"},
+        ]
+    )
+    out = cleaner.add_derived_fields(df)
+    assert "/" not in out.iloc[0]["factory_id"]
+
+
+def test_cleaner_validate_coordinates_rejects_out_of_india() -> None:
+    cleaner = FactoryDataCleaner()
+    df = pd.DataFrame(
+        [
+            {"osm_id": "1", "latitude": 50.0, "longitude": 73.0, "factory_name": "A", "industry_type": "steel", "city": "Pune"},
+            {"osm_id": "2", "latitude": 18.0, "longitude": 80.0, "factory_name": "B", "industry_type": "steel", "city": "Pune"},
+        ]
+    )
+    out = cleaner.validate_coordinates(df)
+    assert len(out) == 1
+    assert out.iloc[0]["osm_id"] == "2"
+
+
+def test_cleaner_full_pipeline_does_not_crash_on_empty_df() -> None:
+    cleaner = FactoryDataCleaner()
+    df = pd.DataFrame(columns=["osm_id", "factory_name", "industry_type", "latitude", "longitude", "city"])
+    out = cleaner.clean(df)
+    assert isinstance(out, pd.DataFrame)
+
+
+def test_processor_risk_category_high_for_chemical() -> None:
+    processor = FactoryProcessor()
+    df = pd.DataFrame([{"industry_type": "chemical"}])
+    out = processor.add_pollution_risk_category(df)
+    assert out.iloc[0]["pollution_risk_category"] == "High"
+
+
+def test_processor_risk_category_medium_for_automotive() -> None:
+    processor = FactoryProcessor()
+    df = pd.DataFrame([{"industry_type": "automotive"}])
+    out = processor.add_pollution_risk_category(df)
+    assert out.iloc[0]["pollution_risk_category"] == "Medium"
+
+
+def test_processor_risk_category_low_for_textile() -> None:
+    processor = FactoryProcessor()
+    df = pd.DataFrame([{"industry_type": "textile"}])
+    out = processor.add_pollution_risk_category(df)
+    assert out.iloc[0]["pollution_risk_category"] == "Low"
+
+
+def test_processor_pd_na_industry_type_does_not_crash() -> None:
+    processor = FactoryProcessor()
+    df = pd.DataFrame([{"industry_type": pd.NA}])
+    out = processor.add_pollution_risk_category(df)
+    assert out.iloc[0]["pollution_risk_category"] == "Low"
+
+
+def test_processor_dbscan_uses_haversine_metric() -> None:
+    processor = FactoryProcessor(dbscan_eps=0.1, dbscan_min_samples=2)
+    df = pd.DataFrame(
+        [
+            {"latitude": 18.5204, "longitude": 73.8567},
+            {"latitude": 18.5210, "longitude": 73.8570},
+        ]
+    )
+    out = processor.add_cluster_id(df)
+    assert "cluster_id" in out.columns
+
+
+def test_processor_final_schema_has_correct_dtypes() -> None:
+    processor = FactoryProcessor()
+    df = pd.DataFrame(
+        [
+            {
+                "factory_id": "OSM_1",
+                "factory_name": "Plant",
+                "industry_type": "steel",
+                "latitude": 18.52,
+                "longitude": 73.85,
+                "city": "Pune",
+                "state": "Maharashtra",
+                "country": "India",
+                "source": "OpenStreetMap",
+                "osm_id": "1",
+                "last_updated": "2026-03-16",
+                "urban_rural": "urban",
+                "pollution_risk_category": "High",
+                "cluster_id": 0,
+            }
+        ]
+    )
+    out = processor.final_schema(df)
+    assert str(out["cluster_id"].dtype) == "int64"
+    assert str(out["latitude"].dtype) == "float64"
+
+
+def test_processor_cluster_id_is_integer() -> None:
+    processor = FactoryProcessor(dbscan_eps=0.1, dbscan_min_samples=2)
+    df = pd.DataFrame(
+        [
+            {"latitude": 18.5204, "longitude": 73.8567},
+            {"latitude": 18.5210, "longitude": 73.8570},
+        ]
+    )
+    out = processor.add_cluster_id(df)
+    assert str(out["cluster_id"].dtype).startswith("int")
