@@ -1,4 +1,4 @@
-﻿"""Root test fixtures and global pytest setup."""
+"""Root test fixtures and global pytest setup."""
 
 from __future__ import annotations
 
