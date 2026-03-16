@@ -50,6 +50,45 @@ from src.recommendations.tree_calculator import (
 router = APIRouter(tags=["Tree Calculator"])
 logger = logging.getLogger(__name__)
 
+# Approximate mapping from 0–10 pollution score to representative concentration values.
+# These are intentionally coarse and only used when we have score data instead of
+# proper μg/m³ (or mg/m³ for CO) readings. They should be tuned if methodology changes.
+POLLUTANT_SCORE_MAX_CONCENTRATIONS = {
+    # μg/m³
+    "pm25": 150.0,   # representative of "severe" PM2.5
+    "pm10": 300.0,   # representative of "severe" PM10
+    "no2": 400.0,
+    "so2": 400.0,
+    "o3": 300.0,
+    # mg/m³ (tree calculator expects mg/m³ for CO)
+    "co": 15.0,
+}
+
+
+def _score_to_concentration(score: Optional[float], pollutant: str) -> Optional[float]:
+    """Convert a 0–10 pollution score to an approximate concentration for the calculator.
+
+    Returns None if the score is missing/invalid or the pollutant is unknown.
+    """
+    if score is None:
+        return None
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        return None
+
+    # Clamp scores to the expected range.
+    if value < 0.0:
+        value = 0.0
+    elif value > 10.0:
+        value = 10.0
+
+    max_conc = POLLUTANT_SCORE_MAX_CONCENTRATIONS.get(pollutant)
+    if max_conc is None:
+        return None
+
+    return (value / 10.0) * max_conc
+
 _calculator = TreePlantingCalculator()
 
 
@@ -152,7 +191,11 @@ def _resolve_factory_data(factory_id: str, loader: DataLoader):
 
 
 def _extract_report_data(report: Optional[dict]) -> tuple[float, str, dict]:
-    """Extract composite_score, dominant_pollutant, pollution_readings from a report dict."""
+    """Extract composite_score, dominant_pollutant, pollution_readings from a report dict.
+
+    For cached data, pollution_scores are 0–10 scores and are converted here into
+    approximate concentrations for use by the TreePlantingCalculator.
+    """
     if report is None:
         return 5.0, "pm25", {}
 
@@ -162,12 +205,12 @@ def _extract_report_data(report: Optional[dict]) -> tuple[float, str, dict]:
     scores = report.get("pollution_scores", {}) or {}
     # pollution_scores are *score* values (0–10), not raw μg/m³ — map to approximate readings
     pollution_readings = {
-        "pm25": scores.get("pm25_score"),
-        "pm10": scores.get("pm10_score"),
-        "no2":  scores.get("no2_score"),
-        "so2":  scores.get("so2_score"),
-        "co":   scores.get("co_score"),
-        "o3":   scores.get("o3_score"),
+        "pm25": _score_to_concentration(scores.get("pm25_score"), "pm25"),
+        "pm10": _score_to_concentration(scores.get("pm10_score"), "pm10"),
+        "no2": _score_to_concentration(scores.get("no2_score"), "no2"),
+        "so2": _score_to_concentration(scores.get("so2_score"), "so2"),
+        "co": _score_to_concentration(scores.get("co_score"), "co"),
+        "o3": _score_to_concentration(scores.get("o3_score"), "o3"),
     }
     return composite_score, dominant_pollutant, pollution_readings
 
