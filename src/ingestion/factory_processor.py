@@ -16,12 +16,34 @@ LOGGER = logging.getLogger(__name__)
 
 
 class FactoryProcessor:
-    """Build derived features and enforce final schema."""
+    """
+    Build derived features and enforce final schema.
+
+    Notes
+    -----
+    The `dbscan_eps` parameter controls spatial clustering of factories using
+    DBSCAN with a haversine distance metric. It is specified as an angular
+    distance in **degrees** (on the Earth's surface) and is converted to
+    radians internally via ``np.radians`` before being passed to DBSCAN.
+    """
 
     HIGH_RISK = {"chemical", "steel", "power", "pharmaceutical", "cement"}
     MEDIUM_RISK = {"manufacturing", "automotive", "paper", "food_processing"}
 
     def __init__(self, dbscan_eps: float = 0.05, dbscan_min_samples: int = 2) -> None:
+        """
+        Initialize the factory processor.
+
+        Parameters
+        ----------
+        dbscan_eps:
+            Neighborhood radius for DBSCAN clustering, expressed as an angular
+            distance in degrees between latitude/longitude points. This value
+            is converted to radians internally for use with the haversine
+            distance metric.
+        dbscan_min_samples:
+            Minimum number of samples required by DBSCAN to form a cluster.
+        """
         self.dbscan_eps = dbscan_eps
         self.dbscan_min_samples = dbscan_min_samples
 
@@ -88,6 +110,7 @@ class FactoryProcessor:
         if int(valid_mask.sum()) >= self.dbscan_min_samples:
             coords_valid = coords[valid_mask].to_numpy()
             coords_valid_rad = np.radians(coords_valid)
+            # `dbscan_eps` is specified in degrees (angular distance) and converted to radians for haversine.
             eps_rad = np.radians(self.dbscan_eps)
             model = DBSCAN(
                 eps=eps_rad,
