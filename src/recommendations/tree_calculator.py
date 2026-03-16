@@ -18,6 +18,11 @@ from typing import Dict, List, Optional
 TREE_PM25_ABSORPTION_UG_M3 = 0.8    # μg/m³ reduction per tree per 100 m²
 TREE_PM10_ABSORPTION_UG_M3 = 1.2    # μg/m³ reduction per tree per 100 m²
 
+# Gaseous pollutant absorption per tree per year
+TREE_NO2_ABSORPTION_G_YEAR = 1.4    # g NO₂ per tree per year
+TREE_SO2_ABSORPTION_G_YEAR = 1.1    # g SO₂ per tree per year
+TREE_CO_ABSORPTION_G_YEAR = 5.3     # g CO per tree per year
+
 # Carbon absorption
 TREE_CO2_ABSORPTION_KG_YEAR = 22.0   # kg CO₂ per mature tree per year
 TREE_CO2_ABSORPTION_TONS_YEAR = 0.022  # tonnes CO₂ per mature tree per year
@@ -150,7 +155,7 @@ class TreePlantingCalculator:
         if reduction_needed == 0.0:
             return 0.0
         area_m2 = impact_area_km2 * 1_000_000
-        return (reduction_needed * area_m2) / (1.4 * TREE_COVERAGE_AREA_M2 / 1_000_000)
+        return (reduction_needed * area_m2) / (TREE_NO2_ABSORPTION_G_YEAR * TREE_COVERAGE_AREA_M2 / 1_000_000)
 
     @staticmethod
     def calculate_trees_for_so2(
@@ -166,7 +171,7 @@ class TreePlantingCalculator:
         if reduction_needed == 0.0:
             return 0.0
         area_m2 = impact_area_km2 * 1_000_000
-        return (reduction_needed * area_m2) / (1.1 * TREE_COVERAGE_AREA_M2 / 1_000_000)
+        return (reduction_needed * area_m2) / (TREE_SO2_ABSORPTION_G_YEAR * TREE_COVERAGE_AREA_M2 / 1_000_000)
 
     @staticmethod
     def calculate_trees_for_co(
