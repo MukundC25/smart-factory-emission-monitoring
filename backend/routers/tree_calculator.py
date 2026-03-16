@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -90,8 +91,27 @@ def _score_to_concentration(score: Optional[float], pollutant: str) -> Optional[
 
     return (value / 10.0) * max_conc
 
+
+class _OpenAQClientProxy:
+    """Thread-local proxy for OpenAQClient to avoid sharing a requests.Session across threads."""
+
+    def __init__(self) -> None:
+        self._local = threading.local()
+
+    def _get_client(self) -> OpenAQClient:
+        client = getattr(self._local, "client", None)
+        if client is None:
+            client = OpenAQClient()
+            self._local.client = client
+        return client
+
+    def __getattr__(self, name):
+        # Delegate attribute access to the thread-local OpenAQClient instance.
+        return getattr(self._get_client(), name)
+
+
 _calculator = TreePlantingCalculator()
-_openaq_client = OpenAQClient()
+_openaq_client = _OpenAQClientProxy()
 
 
 # ---------------------------------------------------------------------------
