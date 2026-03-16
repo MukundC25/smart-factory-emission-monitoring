@@ -10,7 +10,6 @@ from src.recommendations.engine import HybridRecommendationEngine
 
 
 @pytest.fixture
-
 def engine_cfg(mock_config: dict) -> dict:  # type: ignore[no-untyped-def]
     return mock_config
 
