@@ -24,7 +24,7 @@ def _mock_factories_df() -> pd.DataFrame:
         {
             "factory_id": ["FAC001", "FAC002", "FAC003"],
             "factory_name": ["Pune Steel Works", "Mumbai Textiles", "Bengaluru Electronics"],
-            "industry_type": ["manufacturing", "textiles", "electronics"],
+            "industry_type": ["steel", "textiles", "electronics"],
             "latitude": [18.52, 19.07, 12.97],
             "longitude": [73.85, 72.87, 77.59],
             "city": ["Pune", "Mumbai", "Bengaluru"],
@@ -68,7 +68,7 @@ def _mock_recommendations_df() -> pd.DataFrame:
         {
             "factory_id": ["FAC001", "FAC002", "FAC003"],
             "factory_name": ["Pune Steel Works", "Mumbai Textiles", "Bengaluru Electronics"],
-            "industry_type": ["manufacturing", "textiles", "electronics"],
+            "industry_type": ["steel", "textiles", "electronics"],
             "latitude": [18.52, 19.07, 12.97],
             "longitude": [73.85, 72.87, 77.59],
             "city": ["Pune", "Mumbai", "Bengaluru"],
@@ -77,7 +77,7 @@ def _mock_recommendations_df() -> pd.DataFrame:
             "pollution_impact_score": [7.5, 4.2, 8.9],
             "latest_pm25": [45.2, 32.1, 78.5],
             "latest_pm10": [60.0, 42.0, 95.0],
-            "risk_level": ["High", "Low", "High"],
+            "risk_level": ["High", "Low", "Critical"],
             "recommendation": [
                 "Install scrubbers",
                 "Regular maintenance",
@@ -107,6 +107,48 @@ class MockDataLoader:
         """Return mock recommendations."""
         return _mock_recommendations_df()
 
+    def load_recommendation_reports(self) -> list[dict]:
+        """Return recommendation reports used by recommendations endpoints."""
+        records = []
+        for row in _mock_recommendations_df().to_dict(orient="records"):
+            records.append(
+                {
+                    "factory_id": row["factory_id"],
+                    "factory_name": row["factory_name"],
+                    "industry_type": row["industry_type"],
+                    "city": row["city"],
+                    "risk_level": row.get("risk_level", "Low"),
+                    "composite_score": float(row.get("pollution_impact_score", 0.0) or 0.0),
+                    "dominant_pollutant": "pm25",
+                    "pollution_scores": {
+                        "pm25_score": 5.0,
+                        "pm10_score": 5.0,
+                        "so2_score": 4.0,
+                        "no2_score": 4.0,
+                        "co_score": 2.0,
+                        "o3_score": 2.0,
+                    },
+                    "summary": "Mock recommendation summary",
+                    "generated_at": "2026-03-16T00:00:00+00:00",
+                    "recommendations": [
+                        {
+                            "category": "Compliance",
+                            "priority": "Short-term",
+                            "action": "Regular monitoring",
+                            "pollutant": "pm25",
+                            "estimated_reduction": "N/A",
+                            "cost_category": "Low",
+                            "timeline": "1-2 months",
+                        }
+                    ],
+                }
+            )
+        return records
+
+    def refresh(self) -> None:
+        """No-op refresh for test double."""
+        return None
+
     def dataset_info(self) -> dict:
         """Return mock dataset row counts."""
         return {"factories": 3, "pollution": 3, "recommendations": 3}
@@ -127,6 +169,10 @@ class EmptyDataLoader(MockDataLoader):
         """Return empty DataFrame."""
         return pd.DataFrame()
 
+    def load_recommendation_reports(self) -> list[dict]:
+        """Return empty recommendations list."""
+        return []
+
     def dataset_info(self) -> dict:
         """Return zero row counts."""
         return {"factories": 0, "pollution": 0, "recommendations": 0}
@@ -138,8 +184,17 @@ class EmptyDataLoader(MockDataLoader):
 
 
 @pytest.fixture()
-def client() -> TestClient:
-    """TestClient with mock data injected via dependency override."""
+def test_client() -> TestClient:
+    """TestClient with populated mock data via dependency override."""
+    app.dependency_overrides[get_data_loader] = lambda: MockDataLoader()
+    with TestClient(app, raise_server_exceptions=False) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def populated_client() -> TestClient:
+    """Alias fixture explicitly named for populated dataset scenarios."""
     app.dependency_overrides[get_data_loader] = lambda: MockDataLoader()
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
@@ -153,3 +208,18 @@ def empty_client() -> TestClient:
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def recommendations_client() -> TestClient:
+    """Dedicated fixture for recommendations endpoint tests."""
+    app.dependency_overrides[get_data_loader] = lambda: MockDataLoader()
+    with TestClient(app, raise_server_exceptions=False) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def client(test_client: TestClient) -> TestClient:
+    """Backward-compatible fixture name used by existing backend tests."""
+    return test_client
