@@ -288,8 +288,9 @@ async def get_tree_recommendation(
                 pollution_readings[pol] = aqi_data[pol]
 
     current_aqi_val: float
-    if aqi_data.get("aqi"):
-        current_aqi_val = float(aqi_data["aqi"])
+    aqi_val = aqi_data.get("aqi")
+    if aqi_val is not None:
+        current_aqi_val = float(aqi_val)
     else:
         # Rough AQI estimate from composite score (score 0-10 → AQI ~ score * 40)
         current_aqi_val = max(composite_score * 40.0, 50.0)
