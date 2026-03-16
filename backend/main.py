@@ -24,6 +24,7 @@ from backend.utils.data_loader import DataLoader
 from backend.routers.factories import router as factories_router
 from backend.routers.pollution import router as pollution_router
 from backend.routers.recommendations import router as recommendations_router
+from backend.routers.tree_calculator import router as tree_calculator_router
 
 settings = get_settings()
 
@@ -67,6 +68,7 @@ app = FastAPI(
     description=(
         "Production REST API for querying factory locations, pollution readings, "
         "ML-predicted emission impact scores, and city-level air quality statistics.\n\n"
+        "Tree Calculator: /factories/{id}/tree-recommendation\n\n"
         "Pollution endpoints return empty results gracefully when the dataset has not "
         "yet been populated — zero code changes required once real data lands."
     ),
@@ -95,6 +97,7 @@ app.add_middleware(
 app.include_router(factories_router)
 app.include_router(pollution_router)
 app.include_router(recommendations_router)
+app.include_router(tree_calculator_router)
 
 # ---------------------------------------------------------------------------
 # Request logging middleware
