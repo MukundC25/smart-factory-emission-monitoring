@@ -3,6 +3,29 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+import pytest
+
+import backend.routers.recommendations as recommendations_router
+
+
+@pytest.fixture
+def disable_recommendation_exports(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Prevent recommendation generation tests from writing files to the repo tree."""
+
+    def _no_op_export(*args, **kwargs) -> None:  # type: ignore[override]
+        # Intentionally do nothing to avoid filesystem side effects during tests.
+        return None
+
+    monkeypatch.setattr(
+        recommendations_router.RecommendationFormatter,
+        "export_csv",
+        _no_op_export,
+    )
+    monkeypatch.setattr(
+        recommendations_router.RecommendationFormatter,
+        "export_json",
+        _no_op_export,
+    )
 
 
 def test_get_recommendations_returns_200(recommendations_client: TestClient) -> None:
@@ -91,16 +114,25 @@ def test_get_recommendations_stats_last_generated_is_valid_datetime(recommendati
     assert "T" in body["last_generated"]
 
 
-def test_post_generate_returns_200(recommendations_client: TestClient) -> None:
+def test_post_generate_returns_200(
+    recommendations_client: TestClient,
+    disable_recommendation_exports: None,
+) -> None:
     assert recommendations_client.post("/recommendations/generate").status_code == 200
 
 
-def test_post_generate_returns_factories_processed_count(recommendations_client: TestClient) -> None:
+def test_post_generate_returns_factories_processed_count(
+    recommendations_client: TestClient,
+    disable_recommendation_exports: None,
+) -> None:
     body = recommendations_client.post("/recommendations/generate").json()
     assert "factories_processed" in body
 
 
-def test_post_generate_empty_datasets_returns_success_not_500(empty_client: TestClient) -> None:
+def test_post_generate_empty_datasets_returns_success_not_500(
+    empty_client: TestClient,
+    disable_recommendation_exports: None,
+) -> None:
     response = empty_client.post("/recommendations/generate")
     assert response.status_code == 200
     assert response.json()["status"] == "success"
