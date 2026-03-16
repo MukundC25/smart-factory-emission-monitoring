@@ -168,7 +168,7 @@ Start-Process data/output/dashboard.html
 Run API and test endpoints:
 
 ```powershell
-uvicorn backend.main:app --reload
+uvicorn backend.app.main:app --reload
 ```
 
 In another terminal:
@@ -196,17 +196,15 @@ Invoke-RestMethod http://127.0.0.1:8000/pollution/
 Run backend API:
 
 ```bash
-uvicorn backend.main:app --reload
+uvicorn backend.app.main:app --reload
 ```
 
 Available routes:
 
 - `GET /`
-- `GET /factories`
-- `GET /factory/{factory_id}`
-- `GET /pollution`
-- `GET /pollution/stats`
-- `GET /health`
+- `GET /factories/`
+- `GET /pollution/`
+- `GET /recommendation/{factory_id}`
 
 ## Frontend Storytelling UI (React + Mapbox)
 
@@ -282,8 +280,6 @@ Legacy no-build version is still available in `frontend/` for reference.
 - Pollution ingestion uses OpenAQ first, then CPCB placeholder, then synthetic fallback.
 - Missing pollutant values are imputed by station median, then global median.
 - Out-of-range pollutant values are clipped to configured bounds in `config.yaml`.
-- Note: FastAPI will automatically redirect trailing-slash paths (e.g. /factories/) to canonical routes (e.g. /factories).
-
 ```
 
 Example tasks:

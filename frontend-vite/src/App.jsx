@@ -24,26 +24,14 @@ const MAPBOX_TOKEN =
   import.meta.env.VITE_MAPBOX_TOKEN ||
   'pk.eyJ1IjoibXVrdW5kMjAzMyIsImEiOiJjbW1xNThkdWMwcnYzMnFxdHJtNXFycmxhIn0.lfX0rAPb3cx_C7XGj-yOgw'
 
-const CITY_OPTIONS = ['Delhi', 'Pune', 'Chennai', 'Bengaluru', 'Kolkata', 'Ahmedabad', 'Coimbatore', 'Surat', 'Nagpur', 'Visakhapatnam', 'Patna', 'Indore', 'Bhopal', 'Jaipur', 'Lucknow', 'Varanasi', 'Kanpur']
+const CITY_OPTIONS = ['Delhi', 'Mumbai', 'Pune', 'Bangalore', 'Chennai']
 
 const CITY_CENTERS = {
   Delhi: [77.1025, 28.7041],
+  Mumbai: [72.8777, 19.076],
   Pune: [73.8567, 18.5204],
+  Bangalore: [77.5946, 12.9716],
   Chennai: [80.2707, 13.0827],
-  Bengaluru: [77.5946, 12.9716],
-  Kolkata: [88.3639, 22.5726],
-  Ahmedabad: [72.5714, 23.0225],
-  Coimbatore: [76.9558, 11.0168],
-  Surat: [72.8311, 21.1702],
-  Nagpur: [79.0882, 21.1458],
-  Visakhapatnam: [83.2185, 17.6868],
-  Patna: [85.1376, 25.5941],
-  Indore: [75.8577, 22.7196],
-  Bhopal: [77.4126, 23.2599],
-  Jaipur: [75.7873, 26.9124],
-  Lucknow: [80.9462, 26.8467],
-  Varanasi: [83.0104, 25.3176],
-  Kanpur: [80.3319, 26.4499],
 }
 
 const ROUTE_ORDER = ['/', '/city', '/questions', '/analysis', '/map', '/factory', '/ai-score', '/solutions', '/transformation']
@@ -52,12 +40,12 @@ const QUESTIONS = [
   {
     id: 'sector',
     label: 'Which industrial sector do you want to analyze?',
-    options: ['Industrial', 'Works', 'Factory', 'Warehouse', 'Depot', 'All Sectors'],
+    options: ['Steel', 'Chemical', 'Power Plant', 'Manufacturing', 'Mixed Industry'],
   },
   {
     id: 'concern',
     label: 'What pollution concern is most important?',
-    options: ['Air Quality', 'Particulate Matter (PM2.5/PM10)', 'CO2 Emissions', 'Industrial Smoke', 'Water Pollution'],
+    options: ['Air Quality', 'CO2 Emissions', 'Industrial Smoke', 'Water Pollution'],
   },
   {
     id: 'scope',
@@ -118,23 +106,27 @@ function useFactoryData(city) {
     async function fetchFactories() {
       setLoading(true)
       try {
-        const query = new URLSearchParams({ city, page: '1', page_size: '200' })
+        const query = new URLSearchParams({ city, limit: '350' })
         const response = await fetch(`${API_BASE_URL}/factories?${query}`)
         if (!response.ok) {
           throw new Error('Factory fetch failed')
         }
         const payload = await response.json()
         if (!active) return
-        const items = (payload.data || []).map((item) => ({
-          ...item,
-          pollution_score: normalizeScore(item.pollution_impact_score),
-          risk_level: item.risk_level || 'Medium',
-          primary_pollutant: item.dominant_pollutant || 'PM2.5',
-          latest_pm25: Number(item.latest_pm25 || 0),
-          latest_pm10: Number(item.latest_pm10 || 0),
-          latitude: Number(item.latitude),
-          longitude: Number(item.longitude),
-        }))
+        const items = (payload.data || []).map((item, index) => {
+          const score = normalizeScore(item.pollution_score)
+          return {
+            ...item,
+            pollution_score: score,
+            risk_level: item.risk_level || getRiskLabel(score),
+            primary_pollutant:
+              item.primary_pollutant || (score >= 70 ? 'PM2.5' : score >= 40 ? 'NO2' : 'CO'),
+            latest_pm25: Number(item.latest_pm25 || (22 + score * 1.1 + index % 7).toFixed(1)),
+            latest_pm10: Number(item.latest_pm10 || (36 + score * 1.4 + index % 11).toFixed(1)),
+            latitude: Number(item.latitude),
+            longitude: Number(item.longitude),
+          }
+        })
         setFactories(items)
       } catch {
         if (active) setFactories([])
@@ -237,23 +229,16 @@ function SmokeLoadingScreen({ onComplete, isClosing = false }) {
   const containerRef = useRef(null)
   const [animationData, setAnimationData] = useState(null)
 
-  // Load smoke/fog Lottie animation with timeout
+  // Load smoke/fog Lottie animation
   useEffect(() => {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000)
-
-    fetch('https://lottie.host/4b880c43-9676-4825-9dd9-e81456d38e4b/1Yx5k1i4yX.json', {
-      signal: controller.signal,
-    })
+    // Using a smoke particle animation JSON
+    fetch('https://lottie.host/4b880c43-9676-4825-9dd9-e81456d38e4b/1Yx5k1i4yX.json')
       .then(res => res.json())
       .then(data => setAnimationData(data))
-      .catch(() => {})
-      .finally(() => clearTimeout(timeoutId))
-
-    return () => {
-      clearTimeout(timeoutId)
-      controller.abort()
-    }
+      .catch(() => {
+        // Fallback: use GSAP smoke effect if Lottie fails
+        console.log('Lottie load failed, using fallback')
+      })
   }, [])
 
   useEffect(() => {
@@ -296,79 +281,33 @@ function SmokeLoadingScreen({ onComplete, isClosing = false }) {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 1000,
-        background: 'transparent',
-        overflow: 'hidden',
+        zIndex: 100,
+        background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        flexDirection: 'column',
       }}
     >
-      {/* Fullscreen fog SVG background - base layer */}
-      <div 
-        className="fog-bg"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundImage: "url('/fog.svg')",
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          opacity: 0.6,
-        }}
-      />
-      
-      {/* Animated fog overlay with multiple layers */}
-      <div 
-        className="fog-layer-1"
-        style={{
-          position: 'absolute',
-          inset: '-20%',
-          backgroundImage: "url('/fog.svg')",
-          backgroundSize: '150% 150%',
-          backgroundPosition: 'center',
-          opacity: 0.4,
-          animation: 'fog-drift-1 20s ease-in-out infinite',
-          filter: 'blur(10px)',
-        }}
-      />
-      
-      <div 
-        className="fog-layer-2"
-        style={{
-          position: 'absolute',
-          inset: '-10%',
-          backgroundImage: "url('/fog.svg')",
-          backgroundSize: '120% 120%',
-          backgroundPosition: 'center',
-          opacity: 0.3,
-          animation: 'fog-drift-2 25s ease-in-out infinite reverse',
-          filter: 'blur(20px)',
-        }}
-      />
-
       {animationData ? (
         <Lottie 
           animationData={animationData}
           loop={true}
-          style={{ 
-            width: 300, 
-            height: 300, 
-            position: 'relative',
-            zIndex: 10,
-          }}
+          style={{ width: 400, height: 400 }}
         />
-      ) : null}
-      
+      ) : (
+        <div className="smoke-fallback">
+          <div className="smoke-particle" />
+          <div className="smoke-particle" />
+          <div className="smoke-particle" />
+        </div>
+      )}
       <div className="loading-text" style={{ 
         color: 'white', 
         fontSize: '1.5rem', 
         fontFamily: 'Space Grotesk, sans-serif',
         marginTop: '2rem',
-        opacity: 0.9,
-        position: 'relative',
-        zIndex: 10,
-        textShadow: '0 2px 10px rgba(0,0,0,0.5)',
+        opacity: 0.9 
       }}>
         {isClosing ? 'Clearing the air...' : 'Initializing...'}
       </div>
@@ -485,6 +424,8 @@ function FogLayer({ layerIndex, isClean }) {
 function EnvironmentalEffects({ isClean }) {
   return (
     <div className={`effects-layer ${isClean ? 'clean' : ''}`}>
+      {/* Fog removed - user request */}
+      
       {/* Atmospheric haze overlay */}
       <div className="haze-overlay" />
       
@@ -499,198 +440,6 @@ function EnvironmentalEffects({ isClean }) {
           <div className="blades" />
         </div>
       </div>
-    </div>
-  )
-}
-
-// ============================================
-// MOTION CLOUDS LAYER - Using Lottie
-// ============================================
-function CloudLayer({ isClean }) {
-  const [cloudData, setCloudData] = useState(null)
-
-  useEffect(() => {
-    fetch('https://lottie.host/4b880c43-9676-4825-9dd9-e81456d38e4b/1Yx5k1i4yX.json')
-      .then(res => res.json())
-      .then(data => setCloudData(data))
-      .catch(() => {})
-  }, [])
-
-  const cloudPositions = [
-    { top: '5%', left: '10%', scale: 1.2, duration: 80 },
-    { top: '12%', left: '60%', scale: 0.8, duration: 60 },
-    { top: '3%', left: '30%', scale: 1.0, duration: 70 },
-    { top: '18%', left: '75%', scale: 0.6, duration: 50 },
-    { top: '8%', left: '45%', scale: 0.9, duration: 65 },
-    { top: '22%', left: '20%', scale: 0.7, duration: 55 },
-  ]
-
-  return (
-    <div className={`clouds-layer ${isClean ? 'clean' : ''}`}>
-      {cloudData ? (
-        cloudPositions.map((pos, i) => (
-          <div
-            key={i}
-            className="cloud-lottie"
-            style={{
-              position: 'absolute',
-              top: pos.top,
-              left: pos.left,
-              width: `${200 * pos.scale}px`,
-              height: `${120 * pos.scale}px`,
-              animation: `cloud-drift-lottie ${pos.duration}s linear infinite`,
-              animationDelay: `${-i * 10}s`,
-              opacity: isClean ? 0.9 : 0.7,
-            }}
-          >
-            <Lottie
-              animationData={cloudData}
-              loop={true}
-              style={{ width: '100%', height: '100%' }}
-            />
-          </div>
-        ))
-      ) : (
-        cloudPositions.map((pos, i) => (
-          <svg
-            key={i}
-            className="cloud-svg"
-            viewBox="0 0 200 120"
-            style={{
-              position: 'absolute',
-              top: pos.top,
-              left: '-200px',
-              width: `${180 * pos.scale}px`,
-              height: 'auto',
-              animation: `cloud-drift-svg ${pos.duration}s linear infinite`,
-              animationDelay: `${-i * 12}s`,
-              opacity: isClean ? 0.85 : 0.65,
-            }}
-          >
-            <defs>
-              <linearGradient id={`cloudGrad${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
-                <stop offset="50%" stopColor="rgba(255,255,255,0.8)" />
-                <stop offset="100%" stopColor="rgba(240,248,255,0.4)" />
-              </linearGradient>
-              <filter id={`cloudBlur${i}`}>
-                <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
-              </filter>
-            </defs>
-            <g filter={`url(#cloudBlur${i})`}>
-              <ellipse cx="100" cy="60" rx="70" ry="35" fill={`url(#cloudGrad${i})`} />
-              <ellipse cx="60" cy="55" rx="45" ry="30" fill={`url(#cloudGrad${i})`} />
-              <ellipse cx="140" cy="55" rx="50" ry="32" fill={`url(#cloudGrad${i})`} />
-              <ellipse cx="80" cy="40" rx="35" ry="25" fill="rgba(255,255,255,0.9)" />
-              <ellipse cx="120" cy="42" rx="40" ry="28" fill="rgba(255,255,255,0.85)" />
-              <ellipse cx="45" cy="65" rx="25" ry="18" fill={`url(#cloudGrad${i})`} />
-              <ellipse cx="155" cy="62" rx="30" ry="20" fill={`url(#cloudGrad${i})`} />
-            </g>
-          </svg>
-        ))
-      )}
-    </div>
-  )
-}
-
-// ============================================
-// BIRDS LAYER - Realistic flying birds
-// ============================================
-function BirdsLayer({ isClean }) {
-  const [birdData, setBirdData] = useState(null)
-
-  useEffect(() => {
-    fetch('https://lottie.host/8f311dc5-9855-4b8f-9f8e-8f8e8f8e8f8e/8f8e8f8e.json')
-      .then(res => res.json())
-      .then(data => setBirdData(data))
-      .catch(() => {})
-  }, [])
-
-  const birdPositions = [
-    { top: '8%', duration: 25, delay: 0, scale: 0.8 },
-    { top: '15%', duration: 30, delay: 8, scale: 0.6 },
-    { top: '6%', duration: 22, delay: 15, scale: 0.7 },
-    { top: '12%', duration: 28, delay: 5, scale: 0.5 },
-    { top: '18%', duration: 35, delay: 12, scale: 0.9 },
-  ]
-
-  return (
-    <div className={`birds-layer ${isClean ? 'clean' : ''}`}>
-      {birdData ? (
-        birdPositions.map((pos, i) => (
-          <div
-            key={i}
-            className="bird-lottie"
-            style={{
-              position: 'absolute',
-              top: pos.top,
-              left: '-100px',
-              width: `${80 * pos.scale}px`,
-              height: `${60 * pos.scale}px`,
-              animation: `bird-fly ${pos.duration}s linear infinite`,
-              animationDelay: `${pos.delay}s`,
-            }}
-          >
-            <Lottie
-              animationData={birdData}
-              loop={true}
-              style={{ width: '100%', height: '100%' }}
-            />
-          </div>
-        ))
-      ) : (
-        birdPositions.map((pos, i) => (
-          <svg
-            key={i}
-            className="bird-svg"
-            viewBox="0 0 100 60"
-            style={{
-              position: 'absolute',
-              top: pos.top,
-              left: '-80px',
-              width: `${60 * pos.scale}px`,
-              height: 'auto',
-              animation: `bird-fly ${pos.duration}s linear infinite`,
-              animationDelay: `${pos.delay}s`,
-            }}
-          >
-            <defs>
-              <linearGradient id={`birdGrad${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="rgba(60,70,80,0.9)" />
-                <stop offset="100%" stopColor="rgba(40,50,60,0.7)" />
-              </linearGradient>
-            </defs>
-            <ellipse cx="50" cy="30" rx="15" ry="6" fill={`url(#birdGrad${i})`} />
-            <path
-              d={`M 35 28 Q 20 ${18 - (i % 3) * 3} 10 20 Q 25 25 35 28`}
-              fill={`url(#birdGrad${i})`}
-              opacity="0.9"
-            >
-              <animate
-                attributeName="d"
-                values={`M 35 28 Q 20 18 10 20 Q 25 25 35 28; M 35 28 Q 20 12 8 15 Q 22 22 35 28; M 35 28 Q 20 18 10 20 Q 25 25 35 28`}
-                dur="0.8s"
-                repeatCount="indefinite"
-              />
-            </path>
-            <path
-              d={`M 65 28 Q 80 ${18 - (i % 3) * 3} 90 20 Q 75 25 65 28`}
-              fill={`url(#birdGrad${i})`}
-              opacity="0.9"
-            >
-              <animate
-                attributeName="d"
-                values={`M 65 28 Q 80 18 90 20 Q 75 25 65 28; M 65 28 Q 80 12 92 15 Q 78 22 65 28; M 65 28 Q 80 18 90 20 Q 75 25 65 28`}
-                dur="0.8s"
-                repeatCount="indefinite"
-              />
-            </path>
-            <path d="M 35 30 L 20 25 L 22 32 Z" fill={`url(#birdGrad${i})`} />
-            <circle cx="62" cy="28" r="5" fill={`url(#birdGrad${i})`} />
-            <path d="M 66 27 L 72 28 L 66 29 Z" fill="rgba(60,70,80,0.9)" />
-          </svg>
-        ))
-      )}
     </div>
   )
 }
@@ -876,11 +625,7 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
   }, [factories, selectedFactoryId, setSelectedFactoryId])
 
   useEffect(() => {
-    if (!mapContainerRef.current) {
-      console.log('Map container ref not available')
-      return
-    }
-    console.log('Initializing map for city:', city)
+    if (!mapContainerRef.current) return
     mapboxgl.accessToken = MAPBOX_TOKEN
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
@@ -890,11 +635,9 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
     })
     map.addControl(new mapboxgl.NavigationControl(), 'top-right')
     mapRef.current = map
-    console.log('Map initialized successfully')
 
     // Add heatmap source and layer when map loads
     map.on('load', () => {
-      console.log('Map loaded, adding heatmap source')
       map.addSource('pollution-heatmap', {
         type: 'geojson',
         data: {
@@ -925,7 +668,6 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
       })
 
       heatmapLayerRef.current = map.getLayer('heatmap-layer')
-      console.log('Heatmap layer added')
     })
 
     return () => {
@@ -937,20 +679,12 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map) {
-      console.log('Map not available for markers')
-      return
-    }
-    console.log('Adding markers for', factories.length, 'factories')
+    if (!map) return
 
     markersRef.current.forEach((marker) => marker.remove())
     markersRef.current = []
 
-    factories.forEach((factory, index) => {
-      if (!factory.latitude || !factory.longitude) {
-        console.log('Factory', index, 'missing coordinates:', factory.factory_id)
-        return
-      }
+    factories.forEach((factory) => {
       const el = document.createElement('div')
       el.className = 'marker-container'
       const colorClass = getMarkerColorClass(factory.pollution_score)
@@ -972,24 +706,14 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
         </div>
       `
       
-      try {
-        const marker = new mapboxgl.Marker(el)
-          .setLngLat([factory.longitude, factory.latitude])
-          .setPopup(new mapboxgl.Popup({ offset: 15 }).setHTML(popupHtml))
-          .addTo(map)
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([factory.longitude, factory.latitude])
+        .setPopup(new mapboxgl.Popup({ offset: 15 }).setHTML(popupHtml))
+        .addTo(map)
 
-        // Use marker element for click handling
-        marker.getElement().addEventListener('click', (e) => {
-          e.stopPropagation()
-          console.log('Marker clicked:', factory.factory_id)
-          setSelectedFactoryId(factory.factory_id)
-        })
-        markersRef.current.push(marker)
-      } catch (err) {
-        console.error('Error adding marker for factory', factory.factory_id, err)
-      }
+      el.addEventListener('click', () => setSelectedFactoryId(factory.factory_id))
+      markersRef.current.push(marker)
     })
-    console.log('Added', markersRef.current.length, 'markers')
   }, [factories, setSelectedFactoryId])
 
   // Update heatmap data when it changes
@@ -1029,10 +753,6 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
       
       {loading && <p style={{ color: '#718096', marginBottom: '1rem' }}>Loading factories...</p>}
       
-      {!loading && factories.length === 0 && (
-        <p style={{ color: '#E53E3E', marginBottom: '1rem' }}>No factories found for {city}</p>
-      )}
-      
       {!loading && factories.length > 0 && (
         <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
           <div style={{ fontSize: '0.875rem', color: '#4A5568' }}>
@@ -1040,9 +760,6 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
           </div>
           <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '0.25rem' }}>
             {selectedFactory?.industry_type} • Risk: {selectedFactory?.risk_level || 'N/A'}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#718096' }}>
-            ID: {selectedFactoryId || 'none'} | Factories: {factories.length}
           </div>
         </div>
       )}
@@ -1054,10 +771,7 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
       <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
         <button 
           className="cta-button" 
-          onClick={() => {
-            console.log('Button clicked, selectedFactoryId:', selectedFactoryId)
-            handleViewDetails()
-          }}
+          onClick={handleViewDetails}
           disabled={!selectedFactoryId}
           style={{ opacity: selectedFactoryId ? 1 : 0.5 }}
         >
@@ -1206,44 +920,16 @@ function AIScorePage({ factories, selectedFactoryId }) {
 function SolutionView({ factories, selectedFactoryId }) {
   const { goBack, goNext, canGoBack } = useFlowNavigation()
   const factory = factories.find((item) => item.factory_id === selectedFactoryId) || factories[0]
-  const [recommendations, setRecommendations] = useState([])
-  const [loadingRecs, setLoadingRecs] = useState(true)
-  
-  useEffect(() => {
-    async function fetchRecommendations() {
-      if (!factory) return
-      setLoadingRecs(true)
-      try {
-        const response = await fetch(`${API_BASE_URL}/recommendations?city=${factory.city}&page_size=200`)
-        if (response.ok) {
-          const data = await response.json()
-          const factoryRec = data.data?.find(r => r.factory_id === factory.factory_id)
-          if (factoryRec) {
-            setRecommendations([{
-              title: factoryRec.summary || 'AI-Generated Recommendation',
-              desc: factoryRec.summary || 'Based on ML analysis of pollution data',
-              risk_level: factoryRec.risk_level,
-              composite_score: factoryRec.composite_score,
-              dominant_pollutant: factoryRec.dominant_pollutant
-            }])
-          } else {
-            setRecommendations([])
-          }
-        }
-      } catch (err) {
-        console.error('Recommendations fetch failed:', err)
-        setRecommendations([])
-      } finally {
-        setLoadingRecs(false)
-      }
-    }
-    fetchRecommendations()
-  }, [factory])
   
   if (!factory) {
     return <Navigate to="/map" replace />
   }
   
+  const suggestions = (factory.recommendation || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
   const defaultSolutions = [
     { title: 'Install scrubber systems', desc: 'Advanced wet scrubbers can remove 95%+ of particulate matter' },
     { title: 'Upgrade filtration units', desc: 'HEPA and activated carbon filters for toxic gas removal' },
@@ -1251,27 +937,15 @@ function SolutionView({ factories, selectedFactoryId }) {
     { title: 'Real-time monitoring', desc: 'IoT sensors with AI analytics for emission tracking' },
   ]
 
-  const solutionList = recommendations.length > 0 ? recommendations : defaultSolutions
+  const solutionList = suggestions.length 
+    ? suggestions.map((s, i) => ({ title: s, desc: 'AI-recommended improvement' }))
+    : defaultSolutions
 
   return (
     <div className="floating-content">
       <div className="section-label">Step 7 / 7</div>
       <h1 className="page-title">Recommended Solutions</h1>
       <p className="page-subtitle">AI-generated recommendations for {factory.factory_name}</p>
-      
-      {loadingRecs && <p style={{ color: '#718096', marginBottom: '1rem' }}>Loading AI recommendations...</p>}
-      
-      {recommendations.length > 0 && (
-        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.875rem', color: '#4A5568' }}>
-            <strong>Risk Level:</strong> <span className={`badge ${recommendations[0].risk_level?.toLowerCase()}`}>{recommendations[0].risk_level}</span>
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '0.25rem' }}>
-            <strong>Composite Score:</strong> {recommendations[0].composite_score?.toFixed(2)} | 
-            <strong>Dominant Pollutant:</strong> {recommendations[0].dominant_pollutant?.toUpperCase()}
-          </div>
-        </div>
-      )}
       
       <ul className="solution-list">
         {solutionList.map((solution, idx) => (
@@ -1340,9 +1014,17 @@ function AppShell() {
   const { loading, factories } = useFactoryData(city)
   
   const [showLoading, setShowLoading] = useState(true)
+  const [showSolutionSmoke, setShowSolutionSmoke] = useState(false)
 
   const routeIndex = Math.max(0, ROUTE_ORDER.indexOf(location.pathname))
   const isClean = routeIndex >= 8
+  
+  // Handle solution page smoke animation
+  useEffect(() => {
+    if (location.pathname === '/solutions') {
+      setShowSolutionSmoke(true)
+    }
+  }, [location.pathname])
 
   return (
     <>
@@ -1350,52 +1032,52 @@ function AppShell() {
       {showLoading && (
         <SmokeLoadingScreen onComplete={() => setShowLoading(false)} />
       )}
-
-      {!showLoading && (
-        <>
-          <SVGScene isClean={isClean} />
-          <CloudLayer isClean={isClean} />
-          <BirdsLayer isClean={isClean} />
-          <EnvironmentalEffects isClean={isClean} />
-        </>
+      
+      {/* Solution screen smoke closing animation */}
+      {showSolutionSmoke && (
+        <SmokeLoadingScreen 
+          isClosing={true}
+          onComplete={() => setShowSolutionSmoke(false)} 
+        />
       )}
+      
+      <SVGScene isClean={isClean} />
+      <EnvironmentalEffects isClean={isClean} />
       <SmokeTransition />
       
-      <div className="ui-layer" style={{ opacity: showLoading ? 0 : 1, transition: 'opacity 0.5s ease' }}>
-        {!showLoading && (
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/city" element={<CitySelector city={city} setCity={setCity} />} />
-            <Route path="/questions" element={<QuestionFlow answers={answers} setAnswers={setAnswers} />} />
-            <Route path="/analysis" element={<AnalysisLoader />} />
-            <Route
-              path="/map"
-              element={
-                <MapView
-                  city={city}
-                  factories={factories}
-                  loading={loading}
-                  selectedFactoryId={selectedFactoryId}
-                  setSelectedFactoryId={setSelectedFactoryId}
-                />
-              }
-            />
-            <Route
-              path="/factory"
-              element={
-                <FactoryDetails
-                  factories={factories}
-                  selectedFactoryId={selectedFactoryId}
-                  setSelectedFactoryId={setSelectedFactoryId}
-                />
-              }
-            />
-            <Route path="/ai-score" element={<AIScorePage factories={factories} selectedFactoryId={selectedFactoryId} />} />
-            <Route path="/solutions" element={<SolutionView factories={factories} selectedFactoryId={selectedFactoryId} />} />
-            <Route path="/transformation" element={<TransformationPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        )}
+      <div className="ui-layer">
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/city" element={<CitySelector city={city} setCity={setCity} />} />
+          <Route path="/questions" element={<QuestionFlow answers={answers} setAnswers={setAnswers} />} />
+          <Route path="/analysis" element={<AnalysisLoader />} />
+          <Route
+            path="/map"
+            element={
+              <MapView
+                city={city}
+                factories={factories}
+                loading={loading}
+                selectedFactoryId={selectedFactoryId}
+                setSelectedFactoryId={setSelectedFactoryId}
+              />
+            }
+          />
+          <Route
+            path="/factory"
+            element={
+              <FactoryDetails
+                factories={factories}
+                selectedFactoryId={selectedFactoryId}
+                setSelectedFactoryId={setSelectedFactoryId}
+              />
+            }
+          />
+          <Route path="/ai-score" element={<AIScorePage factories={factories} selectedFactoryId={selectedFactoryId} />} />
+          <Route path="/solutions" element={<SolutionView factories={factories} selectedFactoryId={selectedFactoryId} />} />
+          <Route path="/transformation" element={<TransformationPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </div>
     </>
   )
