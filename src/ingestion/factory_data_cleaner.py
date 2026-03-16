@@ -130,17 +130,26 @@ class FactoryDataCleaner:
         return normalized
 
     def _normalize_osm_id(self, osm_id: Any) -> str:
+        # Treat explicit None, NaN, and empty/whitespace-only strings as unknown.
         if osm_id is None:
             return "unknown"
-        sanitized = re.sub(r"[^A-Za-z0-9]", "_", str(osm_id))
+        if isinstance(osm_id, float) and pd.isna(osm_id):
+            return "unknown"
+        text = str(osm_id).strip()
+        if not text or text.lower() in {"nan", "none"}:
+            return "unknown"
+        sanitized = re.sub(r"[^A-Za-z0-9]", "_", text)
         sanitized = re.sub(r"_+", "_", sanitized).strip("_")
         return sanitized or "unknown"
 
     def add_derived_fields(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add required schema fields and metadata."""
         enriched = df.copy()
-        enriched["osm_id"] = enriched.get("osm_id", pd.Series(dtype=str)).astype(str)
-        enriched["factory_id"] = enriched["osm_id"].map(
+        # Use raw osm_id values and let _normalize_osm_id handle missing/NaN cases.
+        osm_series = enriched.get("osm_id")
+        if osm_series is None:
+            osm_series = pd.Series([None] * len(enriched), index=enriched.index)
+        enriched["factory_id"] = osm_series.map(
             lambda osm_id: f"OSM_{self._normalize_osm_id(osm_id)}"
         )
         enriched["source"] = "OpenStreetMap"
