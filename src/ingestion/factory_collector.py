@@ -119,9 +119,24 @@ class OverpassFactoryCollector:
             "factory-emission-monitor/1.0 (contact: admin@example.com)",
         )
 
+    @staticmethod
+    def _build_osm_id(osm_type: Any, osm_local_id: Any) -> str:
+        local_id_str = "" if osm_local_id is None else str(osm_local_id)
+        if not local_id_str:
+            return local_id_str
+        type_str = "" if osm_type is None else str(osm_type).strip()
+        if not type_str:
+            return local_id_str
+        safe_type = type_str.replace("/", "_")
+        return f"{safe_type}_{local_id_str}"
+
     def build_overpass_query(self, city: str, query_type: str, radius_km: int = 25) -> str:
         """Build Overpass QL query for one city and one query type."""
-        lat, lon = self.geocode_city(city)
+        coords = self.geocode_city(city)
+        if coords is None:
+            LOGGER.error("Skipping query — no coordinates for city: %s", city)
+            return ""
+        lat, lon = coords
         radius_m = radius_km * 1000
         return (
             f"[out:json][timeout:{self.timeout}];\n"
@@ -133,7 +148,7 @@ class OverpassFactoryCollector:
             "out center tags;"
         )
 
-    def geocode_city(self, city: str) -> Tuple[float, float]:
+    def geocode_city(self, city: str) -> Optional[Tuple[float, float]]:
         """Resolve city coordinates via cache, Nominatim, then hardcoded fallback."""
         if city in self.city_cache:
             return self.city_cache[city]
@@ -159,10 +174,14 @@ class OverpassFactoryCollector:
         except (GeocoderTimedOut, GeocoderServiceError) as exc:
             LOGGER.warning("Geocode failed for %s: %s", city, exc)
 
-        raise ValueError(f"No coordinates available for city: {city}")
+        LOGGER.error("No coordinates available for city: %s", city)
+        return None
 
     def fetch_overpass(self, query: str, retries: int = 3) -> Dict[str, Any]:
         """Execute Overpass query with retry/backoff behavior."""
+        if not query or not query.strip():
+            LOGGER.warning("Empty query received — skipping Overpass request")
+            return {"elements": []}
         city, query_name = self._last_context
         max_retries = max(1, retries)
 
@@ -228,7 +247,7 @@ class OverpassFactoryCollector:
                 osm_local_id = element.get("id")
                 if osm_local_id is None:
                     continue
-                composite_id = f"{osm_type}/{osm_local_id}" if osm_type else str(osm_local_id)
+                composite_id = self._build_osm_id(osm_type, osm_local_id)
                 if composite_id in seen_ids:
                     continue
                 seen_ids.add(composite_id)
@@ -271,8 +290,8 @@ class OverpassFactoryCollector:
         """Convert one OSM element into a normalized record."""
         tags = element.get("tags", {}) if isinstance(element.get("tags", {}), dict) else {}
         raw_id = element.get("id", "")
-        elem_type = str(element.get("type", "")).strip()
-        osm_id = f"{elem_type}/{raw_id}" if elem_type and raw_id != "" else str(raw_id)
+        elem_type = element.get("type", "")
+        osm_id = self._build_osm_id(elem_type, raw_id)
 
         latitude = element.get("lat")
         longitude = element.get("lon")

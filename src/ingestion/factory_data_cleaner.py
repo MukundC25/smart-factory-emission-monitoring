@@ -123,11 +123,21 @@ class FactoryDataCleaner:
         normalized["industry_type"] = normalized["industry_type"].fillna("unknown")
         return normalized
 
+    def _normalize_osm_id(self, osm_id: Any) -> str:
+        if osm_id is None:
+            return "unknown"
+        import re
+        sanitized = re.sub(r"[^A-Za-z0-9]", "_", str(osm_id))
+        sanitized = re.sub(r"_+", "_", sanitized).strip("_")
+        return sanitized or "unknown"
+
     def add_derived_fields(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add required schema fields and metadata."""
         enriched = df.copy()
         enriched["osm_id"] = enriched.get("osm_id", pd.Series(dtype=str)).astype(str)
-        enriched["factory_id"] = enriched["osm_id"].map(lambda osm_id: f"OSM_{osm_id}")
+        enriched["factory_id"] = enriched["osm_id"].map(
+            lambda osm_id: f"OSM_{self._normalize_osm_id(osm_id)}"
+        )
         enriched["source"] = "OpenStreetMap"
         enriched["state"] = enriched.get("city", pd.Series(dtype=str)).map(lambda city: CITY_TO_STATE.get(str(city), "Unknown"))
         enriched["country"] = "India"

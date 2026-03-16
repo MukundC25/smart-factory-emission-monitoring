@@ -138,11 +138,11 @@ def run_factory_pipeline(config: Dict[str, Any] | None = None) -> pd.DataFrame:
 
 def main() -> None:
     """CLI entry point for module and script execution."""
-    run_factory_pipeline()
-
-
-if __name__ == "__main__":
     result = run_factory_pipeline()
     print("✅ Pipeline complete")
     print(f"🏭 Processed records: {len(result)}")
     print("📁 Check data/raw/factories/factories.csv")
+
+
+if __name__ == "__main__":
+    main()
