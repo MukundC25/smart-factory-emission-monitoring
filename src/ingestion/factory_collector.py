@@ -113,11 +113,16 @@ class OverpassFactoryCollector:
         self.city_cache: Dict[str, Tuple[float, float]] = {}
         self._last_geocode_time = 0.0
         self._last_context: Tuple[str, str] = ("", "")
-        self._geocoder = Nominatim(user_agent="smart_factory_osm_collector")
-        self.user_agent = pipeline_cfg.get(
-            "overpass_user_agent",
-            "factory-emission-monitor/1.0 (contact: admin@example.com)",
-        )
+        self.user_agent = pipeline_cfg.get("overpass_user_agent") or \
+            runtime_config.get("apis", {}).get("overpass_user_agent")
+        if not self.user_agent:
+            raise ValueError(
+                "Overpass user agent must be set via factory_pipeline.overpass_user_agent "
+                "in config.yaml with a valid contact email or URL to comply with "
+                "Overpass/Nominatim usage policies."
+            )
+        nominatim_user_agent = pipeline_cfg.get("nominatim_user_agent", self.user_agent)
+        self._geocoder = Nominatim(user_agent=nominatim_user_agent)
 
     @staticmethod
     def _build_osm_id(osm_type: Any, osm_local_id: Any) -> str:

@@ -98,6 +98,10 @@ heatmap:
   zoom_start: 6
   radius: 25
   blur: 15
+
+factory_pipeline:
+  overpass_user_agent: "smart-factory-emission-monitor/1.0 (github.com/MukundC25/smart-factory-emission-monitoring)"
+  nominatim_user_agent: "smart-factory-emission-monitor/1.0 (github.com/MukundC25/smart-factory-emission-monitoring)"
   min_opacity: 0.4
   max_zoom: 18
   gradient:

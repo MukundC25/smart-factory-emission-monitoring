@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Dict, Tuple
 
+import numpy as np
 import pandas as pd
 from sklearn.cluster import DBSCAN
 
@@ -85,8 +86,15 @@ class FactoryProcessor:
         cluster_ids = pd.Series([-1] * len(enriched), index=enriched.index)
 
         if int(valid_mask.sum()) >= self.dbscan_min_samples:
-            model = DBSCAN(eps=self.dbscan_eps, min_samples=self.dbscan_min_samples)
-            labels = model.fit_predict(coords[valid_mask].to_numpy())
+            coords_valid = coords[valid_mask].to_numpy()
+            coords_valid_rad = np.radians(coords_valid)
+            eps_rad = np.radians(self.dbscan_eps)
+            model = DBSCAN(
+                eps=eps_rad,
+                min_samples=self.dbscan_min_samples,
+                metric="haversine",
+            )
+            labels = model.fit_predict(coords_valid_rad)
             cluster_ids.loc[valid_mask] = labels
 
         enriched["cluster_id"] = cluster_ids.astype(int)

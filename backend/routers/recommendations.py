@@ -195,22 +195,14 @@ def generate_recommendations(loader: DataLoader = Depends(get_data_loader)) -> R
     config = initialize_environment()
     root = get_project_root()
 
-    try:
-        factories_df = loader.load_factories()
-        pollution_df = loader.load_pollution()
-    except FileNotFoundError as exc:
-        logger.warning("Missing input files for generation: %s", exc)
-        return RecommendationsGenerateResponse(
-            status="success",
-            factories_processed=0,
-            output_path=str(root / _resolve_output_json_path(config)),
-        )
+    factories_df = loader.load_factories()
+    pollution_df = loader.load_pollution()
 
-    if factories_df is None or pollution_df is None or factories_df.empty or pollution_df.empty:
+    if factories_df.empty or pollution_df.empty:
         logger.warning(
             "Empty inputs — factories=%d, pollution=%d",
-            0 if factories_df is None else len(factories_df),
-            0 if pollution_df is None else len(pollution_df),
+            len(factories_df),
+            len(pollution_df),
         )
         output_path = str(root / _resolve_output_json_path(config))
         return RecommendationsGenerateResponse(

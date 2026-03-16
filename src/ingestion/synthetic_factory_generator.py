@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Dict, List, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -49,13 +49,20 @@ class SyntheticFactoryGenerator:
         weights = weights / weights.sum()
         return str(self.rng.choice(labels, p=weights))
 
-    def generate(self, n_per_city: int = 20) -> pd.DataFrame:
-        """Generate synthetic factories for all target cities."""
+    def generate(
+        self,
+        n_per_city: int = 20,
+        cities: Sequence[str] | None = None,
+    ) -> pd.DataFrame:
+        """Generate synthetic factories for specified cities.
+        If cities is not provided, generates for all TARGET_CITIES.
+        """
         rows: List[Dict[str, object]] = []
         today = date.today().isoformat()
 
         synthetic_index = 1
-        for city in TARGET_CITIES:
+        cities_to_use: Sequence[str] = TARGET_CITIES if cities is None else cities
+        for city in cities_to_use:
             center = CITY_COORDINATES.get(city)
             if center is None:
                 continue

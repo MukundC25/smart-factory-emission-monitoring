@@ -16,6 +16,7 @@ def _collector() -> OverpassFactoryCollector:
         {
             "apis": {"overpass_url": "https://overpass-api.de/api/interpreter"},
             "factory_pipeline": {
+                "overpass_user_agent": "test-agent/1.0 (test)",
                 "overpass_timeout": 5,
                 "overpass_retries": 1,
                 "city_delay_seconds": 0,
@@ -149,6 +150,7 @@ def test_pipeline_does_not_crash_on_empty_overpass_response(monkeypatch, tmp_pat
         "apis": {"overpass_url": "https://overpass-api.de/api/interpreter"},
         "factory_pipeline": {
             "target_cities": ["Pune", "Mumbai", "Delhi", "Chennai", "Bengaluru", "Kolkata", "Ahmedabad", "Surat", "Hyderabad", "Nagpur"],
+            "overpass_user_agent": "test-agent/1.0 (test)",
             "overpass_timeout": 5,
             "overpass_retries": 1,
             "city_delay_seconds": 0,

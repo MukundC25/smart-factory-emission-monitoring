@@ -126,7 +126,6 @@ class FactoryDataCleaner:
     def _normalize_osm_id(self, osm_id: Any) -> str:
         if osm_id is None:
             return "unknown"
-        import re
         sanitized = re.sub(r"[^A-Za-z0-9]", "_", str(osm_id))
         sanitized = re.sub(r"_+", "_", sanitized).strip("_")
         return sanitized or "unknown"
