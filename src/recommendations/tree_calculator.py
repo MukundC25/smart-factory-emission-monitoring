@@ -237,7 +237,27 @@ class TreePlantingCalculator:
 
     @staticmethod
     def assess_feasibility(trees_recommended: int, planting_area_hectares: float) -> str:
-        """Classify implementation feasibility as High / Medium / Low."""
+        """Classify implementation feasibility as High / Medium / Low.
+
+        Combines tree-count thresholds with available land capacity based on
+        TREE_COVERAGE_AREA_M2.
+        """
+        # If no planting area is specified, fall back to tree-count heuristics.
+        if planting_area_hectares <= 0:
+            if trees_recommended < 500:
+                return "High"
+            if trees_recommended < 2000:
+                return "Medium"
+            return "Low"
+
+        # Maximum number of trees that can be accommodated in the given area.
+        max_trees_capacity = (planting_area_hectares * 10_000) / TREE_COVERAGE_AREA_M2
+
+        # If recommended trees exceed land capacity, feasibility is Low.
+        if trees_recommended > max_trees_capacity:
+            return "Low"
+
+        # Within land capacity, apply original tree-count thresholds.
         if trees_recommended < 500:
             return "High"
         if trees_recommended < 2000:
