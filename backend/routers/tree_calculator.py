@@ -365,6 +365,20 @@ async def get_bulk_tree_recommendations(
                 pollution_readings=pollution_readings,
             )
 
+            # Fallback to cached pollution readings when live AQI data is unavailable,
+            # mirroring the single-factory endpoint behavior.
+            if not aqi_data:
+                aqi_data = {}
+                for pol in ("pm25", "pm10", "no2", "so2", "co", "o3"):
+                    value = pollution_readings.get(pol)
+                    if value is not None:
+                        aqi_data[pol] = value
+                # Use the calculator's AQI index for the response when live AQI is missing.
+                aqi_index = getattr(rec, "aqi_index", None)
+                if aqi_index is not None:
+                    aqi_data["aqi"] = aqi_index
+                aqi_data["source"] = "cached"
+
             results.append(
                 _build_response(fid, factory_name, city, industry_type, rec, aqi_data, data_source)
             )
