@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from backend.schemas.factory import FactoryDetail
 from backend.schemas.pollution import PollutionReading
@@ -19,18 +20,27 @@ RECOMMENDATIONS_JSON = ROOT / "data" / "output" / "recommendations.json"
 RECOMMENDATIONS_CSV = ROOT / "data" / "output" / "recommendations_reports.csv"
 
 
+def _ensure_file(path: Path) -> None:
+    """Skip tests that depend on a data artifact if the file is missing."""
+    if not path.is_file():
+        pytest.skip(f"Missing data artifact for data validation tests: {path}")
+
+
 @lru_cache(maxsize=1)
 def _factories() -> pd.DataFrame:
+    _ensure_file(FACTORIES_CSV)
     return pd.read_csv(FACTORIES_CSV)
 
 
 @lru_cache(maxsize=1)
 def _pollution() -> pd.DataFrame:
+    _ensure_file(POLLUTION_CSV)
     return pd.read_csv(POLLUTION_CSV)
 
 
 @lru_cache(maxsize=1)
 def _reports() -> list[dict]:
+    _ensure_file(RECOMMENDATIONS_JSON)
     payload = json.loads(RECOMMENDATIONS_JSON.read_text(encoding="utf-8"))
     return list(payload.get("reports", []))
 
@@ -152,6 +162,7 @@ def test_pollution_csv_station_lon_in_valid_range() -> None:
 
 
 def test_recommendations_json_is_valid_json() -> None:
+    _ensure_file(RECOMMENDATIONS_JSON)
     payload = json.loads(RECOMMENDATIONS_JSON.read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
 
@@ -177,6 +188,7 @@ def test_recommendations_json_no_nan_values_in_scores() -> None:
 
 
 def test_recommendations_csv_has_required_columns() -> None:
+    _ensure_file(RECOMMENDATIONS_CSV)
     df = pd.read_csv(RECOMMENDATIONS_CSV)
     required = {
         "factory_id",
@@ -197,6 +209,7 @@ def test_recommendations_csv_has_required_columns() -> None:
 
 
 def test_recommendations_csv_immediate_actions_not_all_empty() -> None:
+    _ensure_file(RECOMMENDATIONS_CSV)
     df = pd.read_csv(RECOMMENDATIONS_CSV)
     assert (df["immediate_actions"].fillna("").str.strip() != "").any()
 
