@@ -373,10 +373,9 @@ async def get_bulk_tree_recommendations(
                     value = pollution_readings.get(pol)
                     if value is not None:
                         aqi_data[pol] = value
-                # Use the calculator's AQI index for the response when live AQI is missing.
-                aqi_index = getattr(rec, "aqi_index", None)
-                if aqi_index is not None:
-                    aqi_data["aqi"] = aqi_index
+                # Use the computed current AQI value for the response when live AQI is missing,
+                # matching the single-factory endpoint behavior.
+                aqi_data["aqi"] = current_aqi_val
                 aqi_data["source"] = "cached"
 
             results.append(
