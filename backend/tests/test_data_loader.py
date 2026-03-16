@@ -13,7 +13,6 @@ from backend.utils.data_loader import DataLoader
 
 
 @pytest.fixture
-
 def tmp_settings(tmp_path: Path):  # type: ignore[no-untyped-def]
     class _S:
         FACTORIES_CSV = tmp_path / "factories.csv"
