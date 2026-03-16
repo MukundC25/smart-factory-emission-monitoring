@@ -98,6 +98,14 @@ heatmap:
   zoom_start: 6
   radius: 25
   blur: 15
+  min_opacity: 0.4
+  max_zoom: 18
+  gradient:
+    "0.2": "#00FF00"
+    "0.4": "#FFFF00"
+    "0.6": "#FFA500"
+    "0.8": "#FF0000"
+    "1.0": "#800080"
 
 tree_calculator:
   openaq_base_url: "https://api.openaq.org/v2"
@@ -107,14 +115,6 @@ tree_calculator:
   default_target_aqi: 100
   tree_maturity_years: 5
   trees_per_hectare: 1000
-  min_opacity: 0.4
-  max_zoom: 18
-  gradient:
-    "0.2": "#00FF00"
-    "0.4": "#FFFF00"
-    "0.6": "#FFA500"
-    "0.8": "#FF0000"
-    "1.0": "#800080"
 
 recommendations:
   rule_weight: 0.7
