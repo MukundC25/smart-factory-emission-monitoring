@@ -187,7 +187,7 @@ class TreePlantingCalculator:
         if reduction_needed == 0.0:
             return 0.0
         area_m2 = impact_area_km2 * 1_000_000
-        return (reduction_needed * area_m2) / (TREE_CO_ABSORPTION_G_YEAR * TREE_COVERAGE_AREA_M2 / 1_000_000)
+        return (reduction_needed * area_m2) / (TREE_CO_ABSORPTION_G_YEAR * TREE_COVERAGE_AREA_M2 * 1_000_000)
 
     # -----------------------------------------------------------------------
     # Ancillary calculations
