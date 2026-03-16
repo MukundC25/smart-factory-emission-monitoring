@@ -99,16 +99,22 @@ class FactoryDataCleaner:
         normalized = df.copy()
 
         mapping = {
+            # Food-related industries
             "food": "food_processing",
             "brewery": "food_processing",
             "dairy": "food_processing",
+            # Automotive-related industries
             "automobile": "automotive",
             "auto": "automotive",
             "vehicle": "automotive",
-            "general industry": "general_industrial",
-            "general_industry": "general_industrial",
-            "industrial": "general_industrial",
-            "works": "manufacturing",
+            # General / industrial categories - normalize to canonical labels
+            "general industry": "general_industry",
+            "general_industry": "general_industry",
+            "general_industrial": "general_industry",
+            "industrial": "industrial",
+            # Works / manufacturing categories - normalize to canonical label
+            "works": "works",
+            "manufacturing": "works",
         }
 
         def _map_type(value: Any) -> str:
