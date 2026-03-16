@@ -273,6 +273,19 @@ async def get_tree_recommendation(
         # Rough AQI estimate from composite score (score 0-10 → AQI ~ score * 40)
         current_aqi_val = max(composite_score * 40.0, 50.0)
 
+    # If no live AQI data is available or used, populate aqi_data from cached readings
+    if not aqi_data:
+        aqi_data = {
+            "pm25": pollution_readings.get("pm25"),
+            "pm10": pollution_readings.get("pm10"),
+            "no2": pollution_readings.get("no2"),
+            "so2": pollution_readings.get("so2"),
+            "co": pollution_readings.get("co"),
+            "o3": pollution_readings.get("o3"),
+            "aqi": current_aqi_val,
+            "source": "cached",
+        }
+
     data_source = aqi_data.get("source", "cached") if aqi_data else "cached"
 
     rec = _calculator.calculate_trees_needed(
