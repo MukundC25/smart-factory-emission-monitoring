@@ -51,9 +51,9 @@ def test_get_recommendations_filter_by_city(recommendations_client: TestClient) 
 
 
 def test_get_recommendations_filter_by_industry_type(recommendations_client: TestClient) -> None:
-    body = recommendations_client.get("/recommendations?industry_type=steel").json()
+    body = recommendations_client.get("/recommendations?industry_type=manufacturing").json()
     assert body["total"] >= 1
-    assert all("steel" in item["industry_type"].lower() for item in body["data"])
+    assert all("manufacturing" in item["industry_type"].lower() for item in body["data"])
 
 
 def test_get_recommendations_empty_returns_200_not_500(empty_client: TestClient) -> None:
