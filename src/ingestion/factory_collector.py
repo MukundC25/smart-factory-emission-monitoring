@@ -1,309 +1,469 @@
-"""Collect factory data from OpenStreetMap and optional Google Places."""
+"""Factory collection from OpenStreetMap Overpass API."""
 
 from __future__ import annotations
 
+import json
 import logging
-import os
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+import re
+import time
+from dataclasses import dataclass
+from datetime import date
+from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 import pandas as pd
+import requests
+from geopy.exc import GeocoderServiceError, GeocoderTimedOut
+from geopy.geocoders import Nominatim
 
-from src.common import get_project_root, initialize_environment, safe_request_json
+from src.common import get_project_root, initialize_environment
 
 LOGGER = logging.getLogger(__name__)
 
-CITY_METADATA: Dict[str, Dict[str, Any]] = {
-    "Delhi": {"state": "Delhi", "country": "India", "lat": 28.6139, "lon": 77.2090},
-    "Mumbai": {"state": "Maharashtra", "country": "India", "lat": 19.0760, "lon": 72.8777},
-    "Pune": {"state": "Maharashtra", "country": "India", "lat": 18.5204, "lon": 73.8567},
-    "Bengaluru": {"state": "Karnataka", "country": "India", "lat": 12.9716, "lon": 77.5946},
-    "Chennai": {"state": "Tamil Nadu", "country": "India", "lat": 13.0827, "lon": 80.2707},
-    "Hyderabad": {"state": "Telangana", "country": "India", "lat": 17.3850, "lon": 78.4867},
-    "Kolkata": {"state": "West Bengal", "country": "India", "lat": 22.5726, "lon": 88.3639},
-    "Ahmedabad": {"state": "Gujarat", "country": "India", "lat": 23.0225, "lon": 72.5714},
-    "Surat": {"state": "Gujarat", "country": "India", "lat": 21.1702, "lon": 72.8311},
-    "Jaipur": {"state": "Rajasthan", "country": "India", "lat": 26.9124, "lon": 75.7873},
-    "Lucknow": {"state": "Uttar Pradesh", "country": "India", "lat": 26.8467, "lon": 80.9462},
-    "Kanpur": {"state": "Uttar Pradesh", "country": "India", "lat": 26.4499, "lon": 80.3319},
-    "Patna": {"state": "Bihar", "country": "India", "lat": 25.5941, "lon": 85.1376},
-    "Varanasi": {"state": "Uttar Pradesh", "country": "India", "lat": 25.3176, "lon": 82.9739},
-    "Nagpur": {"state": "Maharashtra", "country": "India", "lat": 21.1458, "lon": 79.0882},
-    "Bhopal": {"state": "Madhya Pradesh", "country": "India", "lat": 23.2599, "lon": 77.4126},
-    "Indore": {"state": "Madhya Pradesh", "country": "India", "lat": 22.7196, "lon": 75.8577},
-    "Visakhapatnam": {"state": "Andhra Pradesh", "country": "India", "lat": 17.6868, "lon": 83.2185},
-    "Coimbatore": {"state": "Tamil Nadu", "country": "India", "lat": 11.0168, "lon": 76.9558},
-    # legacy aliases kept for backward-compat
-    "Delhi NCR": {"state": "Delhi", "country": "India", "lat": 28.6139, "lon": 77.2090},
-    "Bangalore": {"state": "Karnataka", "country": "India", "lat": 12.9716, "lon": 77.5946},
+TARGET_CITIES: List[str] = [
+    "Pune",
+    "Mumbai",
+    "Nagpur",
+    "Nashik",
+    "Aurangabad",
+    "Surat",
+    "Ahmedabad",
+    "Vadodara",
+    "Rajkot",
+    "Chennai",
+    "Coimbatore",
+    "Madurai",
+    "Hyderabad",
+    "Visakhapatnam",
+    "Bengaluru",
+    "Mangaluru",
+    "Delhi",
+    "Noida",
+    "Gurgaon",
+    "Faridabad",
+    "Kolkata",
+    "Howrah",
+    "Jaipur",
+    "Jodhpur",
+    "Bhopal",
+    "Indore",
+    "Lucknow",
+    "Kanpur",
+]
+
+CITY_COORDINATES: Dict[str, Tuple[float, float]] = {
+    "Pune": (18.5204, 73.8567),
+    "Mumbai": (19.0760, 72.8777),
+    "Nagpur": (21.1458, 79.0882),
+    "Nashik": (19.9975, 73.7898),
+    "Aurangabad": (19.8762, 75.3433),
+    "Surat": (21.1702, 72.8311),
+    "Ahmedabad": (23.0225, 72.5714),
+    "Vadodara": (22.3072, 73.1812),
+    "Rajkot": (22.3039, 70.8022),
+    "Chennai": (13.0827, 80.2707),
+    "Coimbatore": (11.0168, 76.9558),
+    "Madurai": (9.9252, 78.1198),
+    "Hyderabad": (17.3850, 78.4867),
+    "Visakhapatnam": (17.6868, 83.2185),
+    "Bengaluru": (12.9716, 77.5946),
+    "Mangaluru": (12.9141, 74.8560),
+    "Delhi": (28.6139, 77.2090),
+    "Noida": (28.5355, 77.3910),
+    "Gurgaon": (28.4595, 77.0266),
+    "Faridabad": (28.4089, 77.3178),
+    "Kolkata": (22.5726, 88.3639),
+    "Howrah": (22.5958, 88.2636),
+    "Jaipur": (26.9124, 75.7873),
+    "Jodhpur": (26.2389, 73.0243),
+    "Bhopal": (23.2599, 77.4126),
+    "Indore": (22.7196, 75.8577),
+    "Lucknow": (26.8467, 80.9462),
+    "Kanpur": (26.4499, 80.3319),
 }
 
-INDUSTRY_TYPES = [
-    "steel",
-    "cement",
-    "chemical",
-    "textile",
-    "automotive",
-    "electronics",
-    "pharmaceutical",
-    "food_processing",
+
+@dataclass(frozen=True)
+class QuerySpec:
+    name: str
+    filter_expr: str
+
+
+QUERY_SPECS: List[QuerySpec] = [
+    QuerySpec("man_made_works", '["man_made"="works"]'),
+    QuerySpec("landuse_industrial", '["landuse"="industrial"]'),
+    QuerySpec("building_industrial", '["building"="industrial"]'),
+    QuerySpec("amenity_factory", '["amenity"="factory"]'),
+    QuerySpec("industrial_factory", '["industrial"="factory"]'),
 ]
 
 
-def _build_overpass_query(city: str) -> str:
-    """Build Overpass query for industrial entities in a city.
+class OverpassFactoryCollector:
+    """Collect and parse factory-like OSM entities from Overpass."""
 
-    Args:
-        city: City name.
-
-    Returns:
-        str: Overpass query string.
-    """
-    city_token = city.replace('"', "")
-    return f"""
-[out:json][timeout:30];
-area["name"="{city_token}"]["boundary"="administrative"]->.searchArea;
-(
-  node["amenity"="factory"](area.searchArea);
-  way["amenity"="factory"](area.searchArea);
-  relation["amenity"="factory"](area.searchArea);
-  node["landuse"="industrial"](area.searchArea);
-  way["landuse"="industrial"](area.searchArea);
-  relation["landuse"="industrial"](area.searchArea);
-  node["man_made"="works"](area.searchArea);
-  way["man_made"="works"](area.searchArea);
-  relation["man_made"="works"](area.searchArea);
-);
-out center tags;
-""".strip()
-
-
-def _extract_industry_type(tags: Dict[str, str]) -> str:
-    """Infer industry type from OSM tags.
-
-    Args:
-        tags: OSM tag dictionary.
-
-    Returns:
-        str: Industry type label.
-    """
-    return (
-        tags.get("industrial")
-        or tags.get("man_made")
-        or tags.get("amenity")
-        or tags.get("landuse")
-        or "general_industry"
-    )
-
-
-def _parse_osm_elements(city: str, elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Transform OSM elements into normalized factory records.
-
-    Args:
-        city: City name.
-        elements: Raw OSM elements.
-
-    Returns:
-        List[Dict[str, Any]]: Factory records.
-    """
-    records: List[Dict[str, Any]] = []
-    now = datetime.now(timezone.utc).isoformat()
-    meta = CITY_METADATA[city]
-    for element in elements:
-        tags = element.get("tags", {})
-        latitude = element.get("lat") or element.get("center", {}).get("lat")
-        longitude = element.get("lon") or element.get("center", {}).get("lon")
-        if latitude is None or longitude is None:
-            continue
-
-        osm_id = str(element.get("id", ""))
-        factory_name = tags.get("name") or f"{city} Industrial Site {osm_id}"
-        records.append(
-            {
-                "factory_id": f"osm_{osm_id}",
-                "factory_name": factory_name,
-                "industry_type": _extract_industry_type(tags),
-                "latitude": float(latitude),
-                "longitude": float(longitude),
-                "city": city,
-                "state": meta["state"],
-                "country": meta["country"],
-                "source": "overpass",
-                "osm_id": osm_id,
-                "last_updated": now,
-            }
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+        runtime_config = config or initialize_environment()
+        pipeline_cfg = runtime_config.get("factory_pipeline", {})
+        self.config = runtime_config
+        self.overpass_url = pipeline_cfg.get(
+            "overpass_url", runtime_config.get("apis", {}).get("overpass_url", "https://overpass-api.de/api/interpreter")
         )
-    return records
-
-
-def _fetch_factories_from_overpass(config: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Fetch factory records from Overpass API for configured cities.
-
-    Args:
-        config: Runtime configuration.
-
-    Returns:
-        List[Dict[str, Any]]: Collected records.
-    """
-    ingestion_cfg = config["ingestion"]
-    url = config["apis"]["overpass_url"]
-    records: List[Dict[str, Any]] = []
-    for city in ingestion_cfg["cities"]:
-        query = _build_overpass_query(city)
-        response = safe_request_json(
-            method="POST",
-            url=url,
-            timeout=ingestion_cfg["timeout_seconds"],
-            max_retries=ingestion_cfg["max_retries"],
-            backoff_base_seconds=ingestion_cfg["backoff_base_seconds"],
-            rate_limit_seconds=ingestion_cfg["rate_limit_seconds"],
-            data={"data": query},
+        self.timeout = int(pipeline_cfg.get("overpass_timeout", 60))
+        self.retries = int(pipeline_cfg.get("overpass_retries", 3))
+        self.city_delay_seconds = float(pipeline_cfg.get("city_delay_seconds", 2))
+        self.city_cache: Dict[str, Tuple[float, float]] = {}
+        self._last_geocode_time = 0.0
+        self._last_context: Tuple[str, str] = ("", "")
+        self.user_agent = (
+            pipeline_cfg.get("overpass_user_agent")
+            or runtime_config.get("apis", {}).get("overpass_user_agent")
         )
-        if not response:
-            LOGGER.warning("No Overpass response for city: %s", city)
-            continue
-        elements = response.get("elements", [])
-        city_records = _parse_osm_elements(city, elements)
-        LOGGER.info("Collected %s OSM factory records for %s", len(city_records), city)
-        records.extend(city_records)
-    return records
-
-
-def _fetch_factories_from_google(config: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Fetch factory records from Google Places API if key is configured.
-
-    Args:
-        config: Runtime configuration.
-
-    Returns:
-        List[Dict[str, Any]]: Google-derived records.
-    """
-    api_key = os.getenv("GOOGLE_PLACES_API_KEY")
-    if not api_key:
-        LOGGER.info("GOOGLE_PLACES_API_KEY not set, skipping Google Places fallback")
-        return []
-
-    ingestion_cfg = config["ingestion"]
-    records: List[Dict[str, Any]] = []
-    now = datetime.now(timezone.utc).isoformat()
-    base_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-
-    for city, meta in CITY_METADATA.items():
-        query = f"factories in {city}"
-        params = {"query": query, "key": api_key}
-        response = safe_request_json(
-            method="GET",
-            url=base_url,
-            timeout=ingestion_cfg["timeout_seconds"],
-            max_retries=ingestion_cfg["max_retries"],
-            backoff_base_seconds=ingestion_cfg["backoff_base_seconds"],
-            rate_limit_seconds=ingestion_cfg["rate_limit_seconds"],
-            params=params,
-        )
-        if not response:
-            continue
-        for place in response.get("results", []):
-            geometry = place.get("geometry", {}).get("location", {})
-            if "lat" not in geometry or "lng" not in geometry:
-                continue
-            place_id = place.get("place_id", "")
-            records.append(
-                {
-                    "factory_id": f"gplaces_{place_id}",
-                    "factory_name": place.get("name", f"{city} Factory"),
-                    "industry_type": "general_industry",
-                    "latitude": float(geometry["lat"]),
-                    "longitude": float(geometry["lng"]),
-                    "city": city,
-                    "state": meta["state"],
-                    "country": meta["country"],
-                    "source": "google_places",
-                    "osm_id": "",
-                    "last_updated": now,
-                }
+        if not self.user_agent:
+            raise ValueError(
+                "Overpass user agent must be set via factory_pipeline.overpass_user_agent "
+                "in config.yaml with a valid contact email or URL to comply with "
+                "Overpass/Nominatim usage policies."
             )
-    LOGGER.info("Collected %s Google Places factory records", len(records))
-    return records
+        nominatim_user_agent = pipeline_cfg.get("nominatim_user_agent", self.user_agent)
+        self._geocoder = Nominatim(user_agent=nominatim_user_agent)
 
+    @staticmethod
+    def _build_osm_id(osm_type: Any, osm_local_id: Any) -> str:
+        local_id_str = "" if osm_local_id is None else str(osm_local_id)
+        if not local_id_str:
+            return local_id_str
+        type_str = "" if osm_type is None else str(osm_type).strip()
+        if not type_str:
+            return local_id_str
+        safe_type = type_str.replace("/", "_")
+        return f"{safe_type}_{local_id_str}"
 
-def _generate_synthetic_factories(required_count: int) -> List[Dict[str, Any]]:
-    """Generate synthetic factory records when real coverage is low.
-
-    Args:
-        required_count: Number of synthetic rows to generate.
-
-    Returns:
-        List[Dict[str, Any]]: Synthetic factory records.
-    """
-    rng = np.random.default_rng(42)
-    records: List[Dict[str, Any]] = []
-    now = datetime.now(timezone.utc).isoformat()
-
-    city_names = list(CITY_METADATA.keys())
-    for index in range(required_count):
-        city = city_names[index % len(city_names)]
-        meta = CITY_METADATA[city]
-        latitude = meta["lat"] + rng.normal(0, 0.08)
-        longitude = meta["lon"] + rng.normal(0, 0.08)
-        industry_type = INDUSTRY_TYPES[index % len(INDUSTRY_TYPES)]
-        records.append(
-            {
-                "factory_id": f"synthetic_{index + 1}",
-                "factory_name": f"{city} {industry_type.title()} Plant {index + 1}",
-                "industry_type": industry_type,
-                "latitude": float(latitude),
-                "longitude": float(longitude),
-                "city": city,
-                "state": meta["state"],
-                "country": meta["country"],
-                "source": "synthetic",
-                "osm_id": "",
-                "last_updated": now,
-            }
+    def build_overpass_query(self, city: str, query_type: str, radius_km: int = 25) -> str:
+        """Build Overpass QL query for one city and one query type."""
+        coords = self.geocode_city(city)
+        if coords is None:
+            LOGGER.error("Skipping query — no coordinates for city: %s", city)
+            return ""
+        lat, lon = coords
+        radius_m = radius_km * 1000
+        return (
+            f"[out:json][timeout:{self.timeout}];\n"
+            "(\n"
+            f"  node{query_type}(around:{radius_m},{lat},{lon});\n"
+            f"  way{query_type}(around:{radius_m},{lat},{lon});\n"
+            f"  relation{query_type}(around:{radius_m},{lat},{lon});\n"
+            ");\n"
+            "out center tags;"
         )
-    return records
+
+    def geocode_city(self, city: str) -> Optional[Tuple[float, float]]:
+        """Resolve city coordinates via cache, Nominatim, then hardcoded fallback."""
+        if city in self.city_cache:
+            return self.city_cache[city]
+
+        # Check hardcoded map first to avoid unnecessary external API calls.
+        coords = CITY_COORDINATES.get(city)
+        if coords is not None:
+            self.city_cache[city] = coords
+            return coords
+
+        now = time.time()
+        elapsed = now - self._last_geocode_time
+        if elapsed < 1.0:
+            time.sleep(1.0 - elapsed)
+
+        try:
+            location = self._geocoder.geocode(f"{city}, India", timeout=10)
+            if location is not None:
+                coords = (float(location.latitude), float(location.longitude))
+                self.city_cache[city] = coords
+                return coords
+        except (GeocoderTimedOut, GeocoderServiceError) as exc:
+            LOGGER.warning("Geocode failed for %s: %s", city, exc)
+        finally:
+            # Always update the last geocode time so failures are rate-limited too.
+            self._last_geocode_time = time.time()
+
+        LOGGER.error("No coordinates available for city: %s", city)
+        return None
+
+    def fetch_overpass(self, query: str, retries: int = 3) -> Dict[str, Any]:
+        """Execute Overpass query with retry/backoff behavior."""
+        if not query or not query.strip():
+            LOGGER.warning("Empty query received — skipping Overpass request")
+            return {"elements": []}
+        city, query_name = self._last_context
+        max_retries = max(1, retries)
+
+        for attempt in range(max_retries):
+            attempt_num = attempt + 1
+            LOGGER.info(
+                "Overpass request attempt %s/%s for city=%s query=%s",
+                attempt_num,
+                max_retries,
+                city,
+                query_name,
+            )
+            try:
+                response = requests.post(
+                    self.overpass_url,
+                    data={"data": query},
+                    timeout=self.timeout,
+                    headers={"User-Agent": self.user_agent},
+                )
+                if response.status_code == 429:
+                    retry_after_header = response.headers.get("Retry-After")
+                    try:
+                        retry_after = int(retry_after_header) if retry_after_header else 30
+                    except (TypeError, ValueError):
+                        retry_after = 30
+                    LOGGER.warning(
+                        "Overpass 429 rate limit — waiting %ss before retry", retry_after
+                    )
+                    time.sleep(retry_after)
+                    continue
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, dict):
+                    return {"elements": []}
+                return payload
+            except (requests.RequestException, ValueError) as exc:
+                if attempt_num >= max_retries:
+                    LOGGER.error("Overpass failed for city=%s query=%s: %s", city, query_name, exc)
+                    break
+                backoff_seconds = 2 ** attempt_num
+                LOGGER.warning(
+                    "Overpass retry for city=%s query=%s after %.1fs due to %s",
+                    city,
+                    query_name,
+                    backoff_seconds,
+                    exc,
+                )
+                time.sleep(backoff_seconds)
+
+        return {"elements": []}
+
+    def collect_city(self, city: str) -> List[Dict[str, Any]]:
+        """Run all query types for one city and deduplicate on OSM id."""
+        collected: List[Dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        for spec in QUERY_SPECS:
+            query = self.build_overpass_query(city=city, query_type=spec.filter_expr)
+            self._last_context = (city, spec.name)
+            payload = self.fetch_overpass(query=query, retries=self.retries)
+            for element in payload.get("elements", []):
+                osm_type = element.get("type", "")
+                osm_local_id = element.get("id")
+                if osm_local_id is None:
+                    continue
+                composite_id = self._build_osm_id(osm_type, osm_local_id)
+                if composite_id in seen_ids:
+                    continue
+                seen_ids.add(composite_id)
+                enriched = dict(element)
+                enriched["_query_type"] = spec.name
+                collected.append(enriched)
+
+        LOGGER.info("City %s: found %s raw elements", city, len(collected))
+        return collected
+
+    def collect_all(self, cities: List[str]) -> pd.DataFrame:
+        """Collect and parse factory-like records for a list of cities."""
+        parsed_records: List[Dict[str, Any]] = []
+        total = len(cities)
+        for index, city in enumerate(cities, start=1):
+            LOGGER.info("Processing city %s/%s: %s", index, total, city)
+            raw_elements = self.collect_city(city)
+            for element in raw_elements:
+                parsed = self.parse_element(element, city)
+                if parsed is not None:
+                    parsed_records.append(parsed)
+            if index < total:
+                time.sleep(self.city_delay_seconds)
+
+        if not parsed_records:
+            return pd.DataFrame(
+                columns=[
+                    "osm_id",
+                    "factory_name",
+                    "industry_type",
+                    "latitude",
+                    "longitude",
+                    "city",
+                    "raw_tags",
+                ]
+            )
+        return pd.DataFrame(parsed_records)
+
+    def parse_element(self, element: Dict[str, Any], city: str) -> Optional[Dict[str, Any]]:
+        """Convert one OSM element into a normalized record."""
+        tags = element.get("tags", {}) if isinstance(element.get("tags", {}), dict) else {}
+        raw_id = element.get("id", "")
+        elem_type = element.get("type", "")
+        osm_id = self._build_osm_id(elem_type, raw_id)
+
+        latitude = element.get("lat")
+        longitude = element.get("lon")
+        if latitude is None or longitude is None:
+            center = element.get("center", {})
+            latitude = center.get("lat")
+            longitude = center.get("lon")
+
+        if latitude is None or longitude is None:
+            return None
+
+        factory_name = tags.get("name") or tags.get("operator") or f"Industrial_{osm_id}"
+        return {
+            "osm_id": osm_id,
+            "factory_name": str(factory_name),
+            "industry_type": self.resolve_industry_type(tags),
+            "latitude": float(latitude),
+            "longitude": float(longitude),
+            "city": city,
+            "raw_tags": json.dumps(tags, sort_keys=True),
+        }
+
+    def resolve_industry_type(self, tags: Dict[str, Any]) -> str:
+        """Map OSM tags to standardized industry type labels."""
+        industrial = str(tags.get("industrial", "")).lower()
+        landuse = str(tags.get("landuse", "")).lower()
+        man_made = str(tags.get("man_made", "")).lower()
+        amenity = str(tags.get("amenity", "")).lower()
+        building = str(tags.get("building", "")).lower()
+        text = " ".join([industrial, landuse, man_made, amenity, building]).strip()
+
+        if any(token in text for token in ["steel", "metal", "smelting"]):
+            return "steel"
+        if any(token in text for token in ["chemical", "refinery"]):
+            return "chemical"
+        if any(token in text for token in ["textile", "garment"]):
+            return "textile"
+        if any(token in text for token in ["pharmaceutical", "medicine"]):
+            return "pharmaceutical"
+        if any(token in text for token in ["cement", "concrete"]):
+            return "cement"
+        if any(token in text for token in ["power", "energy"]):
+            return "power"
+        if any(token in text for token in ["food", "brewery", "dairy"]):
+            return "food_processing"
+        if any(token in text for token in ["auto", "automobile", "vehicle"]):
+            return "automotive"
+        if any(token in text for token in ["paper", "pulp"]):
+            return "paper"
+        if landuse == "industrial":
+            return "general_industrial"
+        if man_made == "works":
+            return "manufacturing"
+        if amenity == "factory":
+            return "factory"
+        return "unknown"
+
+
+def _main_factory_path(config: Dict[str, Any]) -> str:
+    paths = config.get("paths", {})
+    return str(paths.get("factories_clean") or paths.get("factories_raw") or "data/raw/factories/factories.csv")
+
+
+def _sanitize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    cleaned = df.copy()
+    for column in ["factory_name", "industry_type", "city"]:
+        if column in cleaned.columns:
+            cleaned[column] = (
+                cleaned[column]
+                .fillna("")
+                .astype(str)
+                .map(lambda value: re.sub(r"\s+", " ", value).strip())
+            )
+    return cleaned
 
 
 def collect_factory_data(config: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
-    """Collect factory data from APIs and synthetic fallback.
-
-    Args:
-        config: Optional pre-loaded config dictionary.
-
-    Returns:
-        pd.DataFrame: Factory dataset.
-    """
+    """Compatibility entrypoint used by existing project scripts."""
     runtime_config = config or initialize_environment()
-    records = _fetch_factories_from_overpass(runtime_config)
+    collector = OverpassFactoryCollector(runtime_config)
 
-    min_required = int(runtime_config["ingestion"]["min_factory_records"])
-    if len(records) < min_required:
-        google_records = _fetch_factories_from_google(runtime_config)
-        records.extend(google_records)
+    cities = runtime_config.get("factory_pipeline", {}).get("target_cities")
+    if not cities:
+        cities = runtime_config.get("ingestion", {}).get("cities") or TARGET_CITIES
 
-    if len(records) < min_required:
-        synthetic_needed = min_required - len(records)
-        LOGGER.warning(
-            "Only %s real factory records available. Generating %s synthetic records.",
-            len(records),
-            synthetic_needed,
-        )
-        records.extend(_generate_synthetic_factories(synthetic_needed))
+    raw_df = collector.collect_all([str(city) for city in cities])
+    raw_df = _sanitize_columns(raw_df)
 
-    factories_df = pd.DataFrame(records)
-    factories_df = factories_df.drop_duplicates(subset=["factory_id"]).reset_index(drop=True)
+    raw_path = get_project_root() / str(
+        runtime_config.get("paths", {}).get("factories_raw", "data/raw/factories/factories_raw.csv")
+    )
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_df.to_csv(raw_path, index=False)
 
-    output_path = get_project_root() / runtime_config["paths"]["factories_raw"]
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    factories_df.to_csv(output_path, index=False)
-    LOGGER.info("Factory dataset written to %s with %s rows", output_path, len(factories_df))
-    return factories_df
+    # Keep legacy downstream behavior by writing the API-consumed factories file too.
+    main_df = raw_df.copy()
+    if not main_df.empty:
+        main_df["factory_id"] = main_df["osm_id"].map(lambda value: f"OSM_{value}")
+        main_df["source"] = "OpenStreetMap"
+        main_df["country"] = "India"
+        main_df["state"] = main_df["city"].map(lambda value: CITY_TO_STATE.get(value, "Unknown"))
+        main_df["last_updated"] = date.today().isoformat()
+        main_df = main_df[
+            [
+                "factory_id",
+                "factory_name",
+                "industry_type",
+                "latitude",
+                "longitude",
+                "city",
+                "state",
+                "country",
+                "source",
+                "osm_id",
+                "last_updated",
+            ]
+        ]
+
+    # Local import avoids circular dependency (factory_data_cleaner imports CITY_TO_STATE from here)
+    from src.ingestion.factory_data_cleaner import FactoryDataCleaner
+    cleaner = FactoryDataCleaner()
+    main_df = cleaner.clean(main_df)
+    main_path = get_project_root() / _main_factory_path(runtime_config)
+    main_path.parent.mkdir(parents=True, exist_ok=True)
+    main_df.to_csv(main_path, index=False)
+    LOGGER.info("Factory datasets written: raw=%s rows, main=%s rows", len(raw_df), len(main_df))
+    return main_df
+
+
+CITY_TO_STATE: Dict[str, str] = {
+    "Pune": "Maharashtra",
+    "Mumbai": "Maharashtra",
+    "Nagpur": "Maharashtra",
+    "Nashik": "Maharashtra",
+    "Aurangabad": "Maharashtra",
+    "Surat": "Gujarat",
+    "Ahmedabad": "Gujarat",
+    "Vadodara": "Gujarat",
+    "Rajkot": "Gujarat",
+    "Chennai": "Tamil Nadu",
+    "Coimbatore": "Tamil Nadu",
+    "Madurai": "Tamil Nadu",
+    "Hyderabad": "Telangana",
+    "Visakhapatnam": "Andhra Pradesh",
+    "Bengaluru": "Karnataka",
+    "Mangaluru": "Karnataka",
+    "Delhi": "Delhi",
+    "Noida": "Uttar Pradesh",
+    "Gurgaon": "Haryana",
+    "Faridabad": "Haryana",
+    "Kolkata": "West Bengal",
+    "Howrah": "West Bengal",
+    "Jaipur": "Rajasthan",
+    "Jodhpur": "Rajasthan",
+    "Bhopal": "Madhya Pradesh",
+    "Indore": "Madhya Pradesh",
+    "Lucknow": "Uttar Pradesh",
+    "Kanpur": "Uttar Pradesh",
+}
 
 
 def main() -> None:
-    """Run factory data collection module standalone."""
+    """Run factory collection module standalone."""
     config = initialize_environment()
     collect_factory_data(config)
 

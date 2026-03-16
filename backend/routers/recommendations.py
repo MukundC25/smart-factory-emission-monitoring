@@ -7,8 +7,6 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
-
-import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.dependencies import get_data_loader
@@ -195,12 +193,12 @@ def generate_recommendations(loader: DataLoader = Depends(get_data_loader)) -> R
     config = initialize_environment()
     root = get_project_root()
 
-    factories_df = pd.read_csv(root / config["paths"]["factories_raw"])
-    pollution_df = pd.read_csv(root / config["paths"]["pollution_processed"])
+    factories_df = loader.load_factories()
+    pollution_df = loader.load_pollution()
 
     if factories_df.empty or pollution_df.empty:
         logger.warning(
-            "Skipping recommendation generation due to empty inputs (factories=%d, pollution=%d)",
+            "Empty inputs — factories=%d, pollution=%d",
             len(factories_df),
             len(pollution_df),
         )

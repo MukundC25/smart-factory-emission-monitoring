@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     RAW_POLLUTION_CSV: Path = (
         _PROJECT_ROOT / "data" / "raw" / "pollution" / "pollution_readings.csv"
     )
-    PROCESSED_POLLUTION_FILE: Path = _PROJECT_ROOT / "data" / "processed" / "ml_dataset.parquet"
+    PROCESSED_POLLUTION_FILE: Path = _PROJECT_ROOT / "data" / "processed" / "pollution_clean.csv"
     POLLUTION_CSV: Optional[Path] = None
     PROCESSED_DIR: Path = _PROJECT_ROOT / "data" / "processed"
     RECOMMENDATIONS_CSV: Path = _PROJECT_ROOT / "data" / "output" / "recommendations.csv"

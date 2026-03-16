@@ -3,7 +3,9 @@ project:
   country: India
 
 paths:
-  factories_raw: data/raw/factories/factories.csv
+  factories_raw: data/raw/factories/factories_raw.csv
+  factories_clean: data/raw/factories/factories.csv
+  factories_processed: data/processed/factories_processed.csv
   pollution_raw: data/raw/pollution/pollution_readings.csv
   pollution_processed: data/processed/pollution_clean.csv
   processed_dataset: data/processed/ml_dataset.parquet
@@ -109,8 +111,32 @@ recommendations:
   rule_weight: 0.7
   ml_weight: 0.3
   confidence_threshold: 0.4
+  # Used by recommendation engine for station-to-factory matching
   max_station_distance_km: 100
   output_csv: data/output/recommendations_reports.csv
   output_json: data/output/recommendations.json
   model_path: models/recommendation_model.pkl
   encoder_path: models/recommendation_label_encoder.pkl
+
+factory_pipeline:
+  target_cities:
+    - Pune
+    - Mumbai
+    - Chennai
+    - Hyderabad
+    - Bengaluru
+    - Delhi
+    - Kolkata
+    - Ahmedabad
+    - Surat
+    - Nagpur
+  overpass_url: https://overpass-api.de/api/interpreter
+  overpass_user_agent: "smart-factory-emission-monitor/1.0 (github.com/MukundC25/smart-factory-emission-monitoring)"
+  nominatim_user_agent: "smart-factory-emission-monitor/1.0 (github.com/MukundC25/smart-factory-emission-monitoring)"
+  overpass_timeout: 60
+  overpass_retries: 3
+  city_delay_seconds: 2
+  dbscan_eps: 0.05
+  dbscan_min_samples: 2
+  min_factories_threshold: 50
+  synthetic_fallback: true

@@ -39,7 +39,8 @@ def _load_inputs(config: Dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
         tuple[pd.DataFrame, pd.DataFrame]: Factories and pollution dataframes.
     """
     root = get_project_root()
-    factories = pd.read_csv(root / config["paths"]["factories_raw"])
+    factories_rel = config["paths"].get("factories_clean") or config["paths"]["factories_raw"]
+    factories = pd.read_csv(root / factories_rel)
     pollution = pd.read_csv(root / config["paths"]["pollution_raw"])
     pollution["timestamp"] = pd.to_datetime(pollution["timestamp"], errors="coerce", utc=True)
     pollution = pollution.dropna(subset=["timestamp"]).copy()
