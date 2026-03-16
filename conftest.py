@@ -260,31 +260,37 @@ def sample_recommendations() -> list[dict]:
     ]
 
 
-@pytest.fixture
-def mock_config(tmp_path: Path) -> dict:
-    """Runtime config with all output paths redirected to tmp_path."""
+@pytest.fixture(scope="session")
+def shared_tmp_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Shared temp directory for ML artifacts across all tests."""
+    return tmp_path_factory.mktemp("ml_recommender")
+
+
+@pytest.fixture(scope="session")
+def mock_config(shared_tmp_path: Path) -> dict:
+    """Runtime config with all output paths redirected to shared_tmp_path."""
     return {
         "paths": {
-            "processed_dataset": str((tmp_path / "ml_dataset.parquet").as_posix()),
-            "recommendations": str((tmp_path / "recommendations.csv").as_posix()),
-            "model": str((tmp_path / "pollution_impact_model.pkl").as_posix()),
-            "scaler": str((tmp_path / "scaler.pkl").as_posix()),
-            "model_report": str((tmp_path / "model_report.json").as_posix()),
-            "factories_raw": str((tmp_path / "factories_raw.csv").as_posix()),
-            "factories_clean": str((tmp_path / "factories.csv").as_posix()),
-            "factories_processed": str((tmp_path / "factories_processed.csv").as_posix()),
-            "pollution_raw": str((tmp_path / "pollution_readings.csv").as_posix()),
-            "pollution_processed": str((tmp_path / "pollution_clean.csv").as_posix()),
+            "processed_dataset": str((shared_tmp_path / "ml_dataset.parquet").as_posix()),
+            "recommendations": str((shared_tmp_path / "recommendations.csv").as_posix()),
+            "model": str((shared_tmp_path / "pollution_impact_model.pkl").as_posix()),
+            "scaler": str((shared_tmp_path / "scaler.pkl").as_posix()),
+            "model_report": str((shared_tmp_path / "model_report.json").as_posix()),
+            "factories_raw": str((shared_tmp_path / "factories_raw.csv").as_posix()),
+            "factories_clean": str((shared_tmp_path / "factories.csv").as_posix()),
+            "factories_processed": str((shared_tmp_path / "factories_processed.csv").as_posix()),
+            "pollution_raw": str((shared_tmp_path / "pollution_readings.csv").as_posix()),
+            "pollution_processed": str((shared_tmp_path / "pollution_clean.csv").as_posix()),
         },
         "recommendations": {
             "rule_weight": 0.7,
             "ml_weight": 0.3,
             "confidence_threshold": 0.4,
             "max_station_distance_km": 100,
-            "output_csv": str((tmp_path / "recommendations.csv").as_posix()),
-            "output_json": str((tmp_path / "recommendations.json").as_posix()),
-            "model_path": str((tmp_path / "recommendation_model.pkl").as_posix()),
-            "encoder_path": str((tmp_path / "recommendation_label_encoder.pkl").as_posix()),
+            "output_csv": str((shared_tmp_path / "recommendations.csv").as_posix()),
+            "output_json": str((shared_tmp_path / "recommendations.json").as_posix()),
+            "model_path": str((shared_tmp_path / "recommendation_model.pkl").as_posix()),
+            "encoder_path": str((shared_tmp_path / "recommendation_label_encoder.pkl").as_posix()),
         },
         "ml": {
             "random_state": 42,
@@ -305,13 +311,13 @@ def mock_config(tmp_path: Path) -> dict:
     }
 
 
-@pytest.fixture
-def trained_recommender(tmp_path: Path, mock_config: dict) -> MLRecommender:
-    """Return an MLRecommender trained and persisted fully under tmp_path."""
+@pytest.fixture(scope="session")
+def trained_recommender(shared_tmp_path: Path, mock_config: dict) -> MLRecommender:
+    """Return an MLRecommender trained and persisted fully under shared_tmp_path."""
     config = dict(mock_config)
     config["recommendations"] = dict(mock_config["recommendations"])
-    config["recommendations"]["model_path"] = str((tmp_path / "recommendation_model.pkl").as_posix())
-    config["recommendations"]["encoder_path"] = str((tmp_path / "recommendation_label_encoder.pkl").as_posix())
+    config["recommendations"]["model_path"] = str((shared_tmp_path / "recommendation_model.pkl").as_posix())
+    config["recommendations"]["encoder_path"] = str((shared_tmp_path / "recommendation_label_encoder.pkl").as_posix())
     recommender = MLRecommender(config)
     recommender.train()
     return recommender

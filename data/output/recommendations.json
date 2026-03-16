@@ -18,7 +18,7 @@
         "o3_score": 1.6
       },
       "summary": "Bengaluru Electronics is classified as Medium risk with composite score 4.00. Top action: Install bag filter / fabric filter system.",
-      "generated_at": "2026-03-16T15:59:35.210130+00:00",
+      "generated_at": "2026-03-16T16:34:24.547541+00:00",
       "recommendations": [
         {
           "category": "Emission Control",
@@ -120,7 +120,7 @@
         "o3_score": 1.2
       },
       "summary": "Pune Steel Works is classified as Low risk with composite score 2.81. Top action: Install bag filter / fabric filter system.",
-      "generated_at": "2026-03-16T15:59:35.193104+00:00",
+      "generated_at": "2026-03-16T16:34:24.534543+00:00",
       "recommendations": [
         {
           "category": "Emission Control",
@@ -213,7 +213,7 @@
         "o3_score": 1.0
       },
       "summary": "Mumbai Textiles is classified as Low risk with composite score 2.00. Top action: Apply general pollution control measures as per CPCB guidelines.",
-      "generated_at": "2026-03-16T15:59:35.202103+00:00",
+      "generated_at": "2026-03-16T16:34:24.541510+00:00",
       "recommendations": [
         {
           "category": "Industry-Specific",

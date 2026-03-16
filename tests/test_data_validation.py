@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FACTORIES_CSV = ROOT / "data" / "raw" / "factories" / "factories.csv"
 POLLUTION_CSV = ROOT / "data" / "processed" / "pollution_clean.csv"
 RECOMMENDATIONS_JSON = ROOT / "data" / "output" / "recommendations.json"
-RECOMMENDATIONS_CSV = ROOT / "data" / "output" / "recommendations.csv"
+RECOMMENDATIONS_CSV = ROOT / "data" / "output" / "recommendations_reports.csv"
 
 
 @lru_cache(maxsize=1)
