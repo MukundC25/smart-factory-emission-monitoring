@@ -7,8 +7,6 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
-
-import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.dependencies import get_data_loader

@@ -113,8 +113,10 @@ class OverpassFactoryCollector:
         self.city_cache: Dict[str, Tuple[float, float]] = {}
         self._last_geocode_time = 0.0
         self._last_context: Tuple[str, str] = ("", "")
-        self.user_agent = pipeline_cfg.get("overpass_user_agent") or \
-            runtime_config.get("apis", {}).get("overpass_user_agent")
+        self.user_agent = (
+            pipeline_cfg.get("overpass_user_agent")
+            or runtime_config.get("apis", {}).get("overpass_user_agent")
+        )
         if not self.user_agent:
             raise ValueError(
                 "Overpass user agent must be set via factory_pipeline.overpass_user_agent "

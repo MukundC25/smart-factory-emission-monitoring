@@ -48,9 +48,9 @@ def run_factory_pipeline(config: Dict[str, Any] | None = None) -> pd.DataFrame:
         LOGGER.warning("Overpass data collection failed; switching to synthetic fallback dataset")
         num_cities = max(len(cities), 1)
         synthetic_df = SyntheticFactoryGenerator().generate(
-            n_per_city=max(4, int(100 / num_cities))
+            n_per_city=max(4, int(100 / num_cities)),
+            cities=cities,
         )
-        synthetic_df = synthetic_df[synthetic_df["city"].isin(cities)]
         raw_df = synthetic_df[["osm_id", "factory_name", "industry_type", "latitude", "longitude", "city"]].copy()
         raw_df["raw_tags"] = "{}"
 
@@ -64,9 +64,9 @@ def run_factory_pipeline(config: Dict[str, Any] | None = None) -> pd.DataFrame:
         LOGGER.warning("Cleaned data is empty after cleaning; generating synthetic fallback dataset")
         num_cities = max(len(cities), 1)
         generated = SyntheticFactoryGenerator().generate(
-            n_per_city=max(4, int(100 / num_cities))
+            n_per_city=max(4, int(100 / num_cities)),
+            cities=cities,
         )
-        generated = generated[generated["city"].isin(cities)]
         cleaned_df = generated[
             [
                 "factory_id",
@@ -87,8 +87,7 @@ def run_factory_pipeline(config: Dict[str, Any] | None = None) -> pd.DataFrame:
         LOGGER.warning("Collected rows (%s) below threshold (%s); augmenting with synthetic data", len(cleaned_df), min_threshold)
         num_cities = max(len(cities), 1)
         n_per_city = max(4, int((min_threshold - len(cleaned_df)) / num_cities) + 1)
-        generated = SyntheticFactoryGenerator().generate(n_per_city=n_per_city)
-        generated = generated[generated["city"].isin(cities)]
+        generated = SyntheticFactoryGenerator().generate(n_per_city=n_per_city, cities=cities)
         generated_clean = generated[
             [
                 "factory_id",
