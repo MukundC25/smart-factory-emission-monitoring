@@ -1,7 +1,31 @@
 """Pydantic schemas for API request/response validation."""
 
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
+
+
+class YearlyPrediction(BaseModel):
+    """Single year prediction with confidence intervals."""
+    year: int
+    predicted_score: float
+    confidence_lower: float
+    confidence_upper: float
+
+
+class FuturePredictionRequest(BaseModel):
+    """Request for future pollution impact prediction."""
+    factory_id: str
+    years_ahead: int = Field(default=10, ge=1, le=20)
+    scenario: str = Field(default="business_as_usual", pattern="^(business_as_usual|with_interventions)$")
+
+
+class FuturePredictionResponse(BaseModel):
+    """Response with future pollution impact predictions."""
+    factory_id: str
+    current_score: float
+    predictions: List[YearlyPrediction]
+    trend: str = Field(..., pattern="^(increasing|decreasing|stable)$")
+    risk_trajectory: str = Field(..., pattern="^(improving|worsening|stable)$")
 
 
 class FactoryBase(BaseModel):
