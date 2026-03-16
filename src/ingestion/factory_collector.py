@@ -173,13 +173,15 @@ class OverpassFactoryCollector:
 
         try:
             location = self._geocoder.geocode(f"{city}, India", timeout=10)
-            self._last_geocode_time = time.time()
             if location is not None:
                 coords = (float(location.latitude), float(location.longitude))
                 self.city_cache[city] = coords
                 return coords
         except (GeocoderTimedOut, GeocoderServiceError) as exc:
             LOGGER.warning("Geocode failed for %s: %s", city, exc)
+        finally:
+            # Always update the last geocode time so failures are rate-limited too.
+            self._last_geocode_time = time.time()
 
         LOGGER.error("No coordinates available for city: %s", city)
         return None
