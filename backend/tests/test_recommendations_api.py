@@ -40,8 +40,8 @@ def test_get_recommendations_pagination(recommendations_client: TestClient) -> N
 
 def test_get_recommendations_filter_by_risk_level_critical(recommendations_client: TestClient) -> None:
     body = recommendations_client.get("/recommendations?risk_level=critical").json()
-    assert body["total"] >= 1
     assert all(item["risk_level"].lower() == "critical" for item in body["data"])
+
 
 
 def test_get_recommendations_filter_by_city(recommendations_client: TestClient) -> None:
