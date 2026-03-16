@@ -98,10 +98,6 @@ heatmap:
   zoom_start: 6
   radius: 25
   blur: 15
-
-factory_pipeline:
-  overpass_user_agent: "smart-factory-emission-monitor/1.0 (github.com/MukundC25/smart-factory-emission-monitoring)"
-  nominatim_user_agent: "smart-factory-emission-monitor/1.0 (github.com/MukundC25/smart-factory-emission-monitoring)"
   min_opacity: 0.4
   max_zoom: 18
   gradient:
@@ -135,7 +131,8 @@ factory_pipeline:
     - Surat
     - Nagpur
   overpass_url: https://overpass-api.de/api/interpreter
-  overpass_user_agent: "factory-emission-monitor/1.0 (contact: admin@example.com)"
+  overpass_user_agent: "smart-factory-emission-monitor/1.0 (github.com/MukundC25/smart-factory-emission-monitoring)"
+  nominatim_user_agent: "smart-factory-emission-monitor/1.0 (github.com/MukundC25/smart-factory-emission-monitoring)"
   overpass_timeout: 60
   overpass_retries: 3
   city_delay_seconds: 2
