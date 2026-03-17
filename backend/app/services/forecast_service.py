@@ -15,8 +15,8 @@ _pollution_forecast_model = None
 def _get_project_root() -> Path:
     """Get project root directory."""
     # Starting from backend/app/services/forecast_service.py,
-    # go up three levels: services -> app -> backend -> <repo root>
-    return Path(__file__).resolve().parent.parent.parent
+    # go up four levels: services -> app -> backend -> <repo root>
+    return Path(__file__).resolve().parent.parent.parent.parent
 
 
 def _load_forecast_model():
@@ -26,13 +26,19 @@ def _load_forecast_model():
         model_path = _get_project_root() / "models" / "pollution_forecast_model.pkl"
         if model_path.exists():
             try:
-                # Import here to avoid circular imports
-                from src.ml.time_series_predictor import PollutionForecastModel
+                # Import classes needed for unpickling before loading
+                from src.ml.time_series_predictor import (
+                    PollutionForecastModel,
+                    ModelMetrics,
+                    ForecastResult,
+                )
                 _pollution_forecast_model = PollutionForecastModel()
                 _pollution_forecast_model.load(model_path)
                 LOGGER.info("Loaded pollution forecast model from %s", model_path)
             except Exception as e:
                 LOGGER.error("Failed to load forecast model: %s", e)
+                import traceback
+                LOGGER.error("Traceback: %s", traceback.format_exc())
                 _pollution_forecast_model = None
         else:
             LOGGER.warning("Forecast model not found at %s", model_path)
@@ -117,6 +123,9 @@ def predict_future_impact(
 
 def is_forecast_model_ready() -> bool:
     """Check if forecast model is loaded and ready."""
+    global _pollution_forecast_model
+    # Force reload to pick up newly trained model
+    _pollution_forecast_model = None
     model = _load_forecast_model()
     return model is not None and getattr(model, "is_trained", False)
 

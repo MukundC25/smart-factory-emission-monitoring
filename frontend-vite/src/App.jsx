@@ -46,7 +46,7 @@ const CITY_CENTERS = {
   Kanpur: [80.3319, 26.4499],
 }
 
-const ROUTE_ORDER = ['/', '/city', '/questions', '/analysis', '/map', '/factory', '/ai-score', '/solutions', '/transformation']
+const ROUTE_ORDER = ['/', '/city', '/questions', '/analysis', '/map', '/factory', '/ai-score', '/future-prediction', '/solutions', '/transformation']
 
 const QUESTIONS = [
   {
@@ -748,7 +748,7 @@ function CitySelector({ city, setCity }) {
   
   return (
     <div className="floating-content">
-      <div className="section-label">Step 1 / 7</div>
+      <div className="section-label">Step 1 / 8</div>
       <h1 className="page-title">Select a City</h1>
       <p className="page-subtitle">Choose a city to analyze industrial pollution patterns.</p>
       
@@ -793,7 +793,7 @@ function QuestionFlow({ answers, setAnswers }) {
 
   return (
     <div className="floating-content">
-      <div className="section-label">Step 2 / 7 • Question {currentQuestion + 1} of {QUESTIONS.length}</div>
+      <div className="section-label">Step 2 / 8 • Question {currentQuestion + 1} of {QUESTIONS.length}</div>
       <h1 className="page-title">{question.label}</h1>
       
       <div className="question-container">
@@ -825,7 +825,7 @@ function AnalysisLoader() {
 
   return (
     <div className="floating-content">
-      <div className="section-label">Step 3 / 7</div>
+      <div className="section-label">Step 3 / 8</div>
       <div className="analysis-container">
         <div className="scanner-container">
           <div className="scanner-ring" />
@@ -1023,8 +1023,8 @@ function MapView({ city, factories, loading, selectedFactoryId, setSelectedFacto
 
   return (
     <div className="floating-content" style={{ maxWidth: '900px' }}>
-      <div className="section-label">Step 4 / 7</div>
-      <h1 className="page-title">Factory Map: {city}</h1>
+      <div className="section-label">Step 4 / 8</div>
+      <h1 className="page-title">Factory Pollution Map</h1>
       <p className="page-subtitle">Click markers to view details. The heatmap shows pollution intensity.</p>
       
       {loading && <p style={{ color: '#718096', marginBottom: '1rem' }}>Loading factories...</p>}
@@ -1106,56 +1106,58 @@ function FactoryDetails({ factories, selectedFactoryId, setSelectedFactoryId }) 
 
   return (
     <div className="floating-content">
-      <div className="section-label">Step 5 / 7</div>
+      <div className="section-label">Step 5 / 8</div>
       <h1 className="page-title">{factory.factory_name}</h1>
       <p className="page-subtitle">{factory.industry_type} • Pollution Impact Report</p>
       
-      <div className="badge-group">
-        <span className={`badge ${colorClass}`}>Risk: {factory.risk_level || getRiskLabel(metrics.score)}</span>
-        <span className="badge">Primary: {factory.primary_pollutant || 'PM2.5'}</span>
-      </div>
+      <div className="blur-wrapper" style={{ marginBottom: '1.5rem' }}>
+        <div className="badge-group">
+          <span className={`badge ${colorClass}`}>Risk: {factory.risk_level || getRiskLabel(metrics.score)}</span>
+          <span className="badge">Primary: {factory.primary_pollutant || 'PM2.5'}</span>
+        </div>
 
-      <div className="metric-grid">
-        <div className="metric-card">
-          <div className="metric-label">Pollution Score</div>
-          <div className={`metric-value ${colorClass}`}>{metrics.score}</div>
+        <div className="metric-grid">
+          <div className="metric-card">
+            <div className="metric-label">Pollution Score</div>
+            <div className={`metric-value ${colorClass}`}>{metrics.score}</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">PM2.5</div>
+            <div className="metric-value">{metrics.pm25}</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">PM10</div>
+            <div className="metric-value">{metrics.pm10}</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">NO2</div>
+            <div className="metric-value">{metrics.no2}</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">SO2</div>
+            <div className="metric-value">{metrics.so2}</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">CO</div>
+            <div className="metric-value">{metrics.co}</div>
+          </div>
         </div>
-        <div className="metric-card">
-          <div className="metric-label">PM2.5</div>
-          <div className="metric-value">{metrics.pm25}</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">PM10</div>
-          <div className="metric-value">{metrics.pm10}</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">NO2</div>
-          <div className="metric-value">{metrics.no2}</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">SO2</div>
-          <div className="metric-value">{metrics.so2}</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-label">CO</div>
-          <div className="metric-value">{metrics.co}</div>
-        </div>
-      </div>
 
-      <div className="chart-container">
-        <Line
-          data={chartData}
-          options={{
-            responsive: true,
-            plugins: {
-              legend: { labels: { color: '#2D3748' } },
-            },
-            scales: {
-              x: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' } },
-              y: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' } },
-            },
-          }}
-        />
+        <div className="chart-container">
+          <Line
+            data={chartData}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: { labels: { color: '#2D3748' } },
+              },
+              scales: {
+                x: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+                y: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+              },
+            }}
+          />
+        </div>
       </div>
       
       <NavArrows onBack={goBack} onNext={goNext} canGoBack={canGoBack} />
@@ -1179,7 +1181,7 @@ function AIScorePage({ factories, selectedFactoryId }) {
 
   return (
     <div className="floating-content">
-      <div className="section-label">Step 6 / 7</div>
+      <div className="section-label">Step 6 / 8</div>
       <h1 className="page-title">AI Impact Analysis</h1>
       <p className="page-subtitle">{factory.factory_name}</p>
       
@@ -1203,11 +1205,197 @@ function AIScorePage({ factories, selectedFactoryId }) {
   )
 }
 
+function FuturePredictionView({ factories, selectedFactoryId }) {
+  const { goBack, goNext, canGoBack } = useFlowNavigation()
+  const factory = factories.find((item) => item.factory_id === selectedFactoryId) || factories[0]
+  const [prediction, setPrediction] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [selectedYears, setSelectedYears] = useState(10)
+  
+  useEffect(() => {
+    async function fetchPrediction() {
+      if (!factory) return
+      setLoading(true)
+      try {
+        const response = await fetch(`${API_BASE_URL}/factories/${factory.factory_id}/predict-future`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            years_ahead: selectedYears,
+            scenario: 'business_as_usual'
+          })
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setPrediction(data)
+        } else {
+          console.error('Prediction API error:', response.status)
+          setPrediction(null)
+        }
+      } catch (err) {
+        console.error('Future prediction fetch failed:', err)
+        setPrediction(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchPrediction()
+  }, [factory, selectedYears])
+  
+  if (!factory) {
+    return <Navigate to="/map" replace />
+  }
+  
+  const metrics = deriveFactoryMetrics(factory)
+  const currentScore = prediction?.current_score || metrics.score
+  
+  if (!prediction || !prediction.predictions || prediction.predictions.length === 0) {
+    return (
+      <div className="floating-content">
+        <div className="section-label">Step 7 / 8</div>
+        <h1 className="page-title">10-Year Pollution Forecast</h1>
+        <p className="page-subtitle">{factory.factory_name}</p>
+        
+        {loading ? (
+          <p style={{ color: '#718096', marginTop: '2rem' }}>Generating AI forecast using trained LSTM model...</p>
+        ) : (
+          <div className="blur-wrapper" style={{ marginTop: '2rem' }}>
+            <p style={{ color: '#E53E3E', textAlign: 'center' }}>Unable to generate forecast. Please ensure the ML model is trained and loaded.</p>
+            <p style={{ color: '#718096', fontSize: '0.875rem', textAlign: 'center', marginTop: '0.5rem' }}>Check backend logs for model availability.</p>
+          </div>
+        )}
+        
+        <NavArrows onBack={goBack} onNext={goNext} canGoBack={canGoBack} />
+      </div>
+    )
+  }
+  
+  const lastPrediction = prediction.predictions[prediction.predictions.length - 1]
+  const futureScore = lastPrediction.predicted_score
+  const change = ((futureScore - currentScore) / currentScore * 100).toFixed(1)
+  const trend = prediction.trend || (futureScore > currentScore ? 'WORSENING' : futureScore < currentScore ? 'IMPROVING' : 'STABLE')
+  const colorClass = getMarkerColorClass(futureScore)
+  
+  const chartData = {
+    labels: prediction.predictions.map(p => p.year),
+    datasets: [
+      {
+        label: 'Predicted Score',
+        data: prediction.predictions.map(p => p.predicted_score),
+        borderColor: '#3B82F6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        fill: false,
+        tension: 0.4,
+      },
+      {
+        label: 'Confidence Upper',
+        data: prediction.predictions.map(p => p.confidence_upper),
+        borderColor: 'rgba(59, 130, 246, 0.3)',
+        borderDash: [3, 3],
+        fill: false,
+        pointRadius: 0,
+      },
+      {
+        label: 'Confidence Lower',
+        data: prediction.predictions.map(p => p.confidence_lower),
+        borderColor: 'rgba(59, 130, 246, 0.3)',
+        borderDash: [3, 3],
+        fill: false,
+        pointRadius: 0,
+      },
+      {
+        label: 'High-Risk Threshold',
+        data: Array(prediction.predictions.length).fill(70),
+        borderColor: '#E53E3E',
+        borderDash: [5, 5],
+        fill: false,
+        pointRadius: 0,
+      },
+    ],
+  }
+
+  return (
+    <div className="floating-content">
+      <div className="section-label">Step 7 / 8</div>
+      <h1 className="page-title">AI Pollution Forecast</h1>
+      <p className="page-subtitle">{factory.factory_name} • LSTM Time-Series Model</p>
+      
+      <div className="blur-wrapper" style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+          {[3, 5, 10].map(years => (
+            <button
+              key={years}
+              className={`city-btn ${selectedYears === years ? 'active' : ''}`}
+              onClick={() => setSelectedYears(years)}
+              style={{ minWidth: '80px' }}
+            >
+              {years} Years
+            </button>
+          ))}
+        </div>
+        {loading && <p style={{ color: '#718096', marginTop: '1rem', textAlign: 'center' }}>Generating forecast using trained ML model...</p>}
+      </div>
+      
+      <div className="blur-wrapper" style={{ marginBottom: '1.5rem' }}>
+        <div className="metric-grid">
+          <div className="metric-card">
+            <div className="metric-label">Current Score</div>
+            <div className="metric-value">{currentScore.toFixed(1)}</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">Projected ({lastPrediction.year})</div>
+            <div className={`metric-value ${colorClass}`}>{futureScore.toFixed(1)}</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-label">Change</div>
+            <div className={`metric-value ${change > 0 ? 'bad' : 'good'}`}>{change > 0 ? '+' : ''}{change}%</div>
+          </div>
+        </div>
+        
+        <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.3)', borderRadius: '8px' }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#2D3748' }}>
+            🔮 Risk Trajectory: <span className={`badge ${trend === 'WORSENING' ? 'bad' : trend === 'IMPROVING' ? 'good' : 'warn'}`}>{trend.toUpperCase()}</span>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#4A5568', marginTop: '0.25rem' }}>
+            {prediction.risk_trajectory || (trend === 'WORSENING' ? `Without intervention, pollution will increase over the next ${selectedYears} years` : 
+             trend === 'IMPROVING' ? 'Current measures are projected to reduce pollution levels' :
+             'Pollution levels expected to remain stable')}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '0.5rem', fontStyle: 'italic' }}>
+            ✓ Prediction from trained LSTM model (pollution_forecast_model.pkl)
+          </div>
+        </div>
+      </div>
+
+      <div className="chart-container">
+        <Line
+          data={chartData}
+          options={{
+            responsive: true,
+            plugins: {
+              legend: { labels: { color: '#2D3748' } },
+              title: { display: true, text: '10-Year Pollution Forecast', color: '#2D3748' },
+            },
+            scales: {
+              x: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+              y: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' }, min: 0, max: 100 },
+            },
+          }}
+        />
+      </div>
+      
+      <NavArrows onBack={goBack} onNext={goNext} canGoBack={canGoBack} />
+    </div>
+  )
+}
+
 function SolutionView({ factories, selectedFactoryId }) {
   const { goBack, goNext, canGoBack } = useFlowNavigation()
   const factory = factories.find((item) => item.factory_id === selectedFactoryId) || factories[0]
   const [recommendations, setRecommendations] = useState([])
   const [loadingRecs, setLoadingRecs] = useState(true)
+  const [treeData, setTreeData] = useState(null)
+  const [loadingTrees, setLoadingTrees] = useState(true)
   
   useEffect(() => {
     async function fetchRecommendations() {
@@ -1237,7 +1425,28 @@ function SolutionView({ factories, selectedFactoryId }) {
         setLoadingRecs(false)
       }
     }
+    
+    async function fetchTreeRecommendation() {
+      if (!factory) return
+      setLoadingTrees(true)
+      try {
+        const response = await fetch(`${API_BASE_URL}/tree-calculator/${factory.factory_id}`)
+        if (response.ok) {
+          const data = await response.json()
+          setTreeData(data)
+        } else {
+          setTreeData(null)
+        }
+      } catch (err) {
+        console.error('Tree calculator fetch failed:', err)
+        setTreeData(null)
+      } finally {
+        setLoadingTrees(false)
+      }
+    }
+    
     fetchRecommendations()
+    fetchTreeRecommendation()
   }, [factory])
   
   if (!factory) {
@@ -1255,39 +1464,82 @@ function SolutionView({ factories, selectedFactoryId }) {
 
   return (
     <div className="floating-content">
-      <div className="section-label">Step 7 / 7</div>
+      <div className="section-label">Step 8 / 8</div>
       <h1 className="page-title">Recommended Solutions</h1>
       <p className="page-subtitle">AI-generated recommendations for {factory.factory_name}</p>
       
       {loadingRecs && <p style={{ color: '#718096', marginBottom: '1rem' }}>Loading AI recommendations...</p>}
       
-      {recommendations.length > 0 && (
-        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.5)', borderRadius: '8px' }}>
-          <div style={{ fontSize: '0.875rem', color: '#4A5568' }}>
-            <strong>Risk Level:</strong> <span className={`badge ${recommendations[0].risk_level?.toLowerCase()}`}>{recommendations[0].risk_level}</span>
+      <div className="blur-wrapper" style={{ marginBottom: '1.5rem' }}>
+        {recommendations.length > 0 && (
+          <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(255,255,255,0.3)', borderRadius: '8px' }}>
+            <div style={{ fontSize: '0.875rem', color: '#4A5568' }}>
+              <strong>Risk Level:</strong> <span className={`badge ${recommendations[0].risk_level?.toLowerCase()}`}>{recommendations[0].risk_level}</span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '0.25rem' }}>
+              <strong>Composite Score:</strong> {recommendations[0].composite_score?.toFixed(2)} | 
+              <strong>Dominant Pollutant:</strong> {recommendations[0].dominant_pollutant?.toUpperCase()}
+            </div>
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '0.25rem' }}>
-            <strong>Composite Score:</strong> {recommendations[0].composite_score?.toFixed(2)} | 
-            <strong>Dominant Pollutant:</strong> {recommendations[0].dominant_pollutant?.toUpperCase()}
+        )}
+        
+        {treeData && (
+          <div style={{ marginBottom: '1rem', padding: '1rem', background: 'rgba(72, 187, 120, 0.1)', borderRadius: '8px', border: '1px solid rgba(72, 187, 120, 0.3)' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#2D3748', marginBottom: '0.75rem' }}>
+              🌳 Nature-Based Solution
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#718096' }}>Trees Needed</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#2D3748' }}>
+                  {treeData.trees_needed?.recommended?.toLocaleString() || 'N/A'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#718096' }}>Planting Area</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#2D3748' }}>
+                  {treeData.planting_area_hectares?.toFixed(1) || 'N/A'} ha
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#718096' }}>CO₂ Offset</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#2D3748' }}>
+                  {treeData.annual_co2_offset_tons?.toFixed(1) || 'N/A'} tons/yr
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#718096' }}>AQI Reduction</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#48BB78' }}>
+                  -{treeData.estimated_aqi_reduction || 'N/A'} pts
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#4A5568' }}>
+              Current AQI: <strong>{treeData.current_aqi || 'N/A'}</strong> → Target: <strong>{treeData.target_aqi || 100}</strong> (in {treeData.timeline_years || 5} years)
+            </div>
           </div>
-        </div>
-      )}
+        )}
+        {loadingTrees && <p style={{ color: '#718096', fontSize: '0.875rem' }}>Calculating tree planting recommendations...</p>}
+      </div>
       
-      <ul className="solution-list">
-        {solutionList.map((solution, idx) => (
-          <li key={idx} className="solution-item">
-            <div className="solution-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-            </div>
-            <div className="solution-text">
-              <div className="solution-title">{solution.title}</div>
-              <div className="solution-desc">{solution.desc}</div>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div className="blur-wrapper">
+        <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#2D3748', marginBottom: '1rem' }}>⚙️ Technical Solutions</h3>
+        <ul className="solution-list">
+          {solutionList.map((solution, idx) => (
+            <li key={idx} className="solution-item">
+              <div className="solution-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+              </div>
+              <div className="solution-text">
+                <div className="solution-title">{solution.title}</div>
+                <div className="solution-desc">{solution.desc}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
       
       <NavArrows onBack={goBack} onNext={goNext} canGoBack={canGoBack} />
     </div>
@@ -1391,6 +1643,7 @@ function AppShell() {
               }
             />
             <Route path="/ai-score" element={<AIScorePage factories={factories} selectedFactoryId={selectedFactoryId} />} />
+            <Route path="/future-prediction" element={<FuturePredictionView factories={factories} selectedFactoryId={selectedFactoryId} />} />
             <Route path="/solutions" element={<SolutionView factories={factories} selectedFactoryId={selectedFactoryId} />} />
             <Route path="/transformation" element={<TransformationPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
