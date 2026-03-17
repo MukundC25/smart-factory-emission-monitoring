@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "buildCommand": "pip install -r requirements-vercel.txt",
+  "outputDirectory": ".",
+  "framework": "python",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ]
+}
