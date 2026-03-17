@@ -14,7 +14,6 @@ class YearlyPrediction(BaseModel):
 
 class FuturePredictionRequest(BaseModel):
     """Request for future pollution impact prediction."""
-    factory_id: str
     years_ahead: int = Field(default=10, ge=1, le=20)
     scenario: str = Field(default="business_as_usual", pattern="^(business_as_usual|with_interventions)$")
 

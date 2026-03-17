@@ -4,7 +4,6 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-import joblib
 import pandas as pd
 
 LOGGER = logging.getLogger(__name__)
@@ -15,7 +14,9 @@ _pollution_forecast_model = None
 
 def _get_project_root() -> Path:
     """Get project root directory."""
-    return Path(__file__).parent.parent.parent.parent.parent
+    # Starting from backend/app/services/forecast_service.py,
+    # go up three levels: services -> app -> backend -> <repo root>
+    return Path(__file__).resolve().parent.parent.parent
 
 
 def _load_forecast_model():

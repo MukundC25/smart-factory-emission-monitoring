@@ -19,10 +19,9 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, PolynomialFeatures, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from src.common import get_project_root
 
@@ -355,7 +354,7 @@ class PollutionForecastModel:
             output_dir.mkdir(parents=True, exist_ok=True)
 
             model_path = output_dir / "pollution_forecast_model.pkl"
-            joblib.dump(self.model, model_path)
+            self.save(model_path)
             artifacts["model_path"] = str(model_path)
 
             # Save metrics
@@ -453,7 +452,7 @@ class PollutionForecastModel:
 
             # Apply scenario factor (interventions reduce growth)
             if scenario == "with_interventions":
-                pred = current_score + (pred - current_score) * 0.7
+                pred = current_score + (pred - current_score) * scenario_factor
 
             # Clip to valid range
             pred = np.clip(pred, 0.0, 10.0)

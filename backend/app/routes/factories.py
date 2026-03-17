@@ -84,7 +84,7 @@ def _load_factories_data(csv_path: Optional[Path] = None) -> pd.DataFrame:
     return _factories_cache
 
 
-@router.get("/", response_model=List[Factory])
+@router.get("/")
 def get_factories(city: Optional[str] = Query(None), limit: int = Query(100, ge=1, le=1000)):
     """Get list of all factories with optional filtering.
 
@@ -93,13 +93,13 @@ def get_factories(city: Optional[str] = Query(None), limit: int = Query(100, ge=
         limit: Maximum number of results.
 
     Returns:
-        List[Factory]: List of factories.
+        dict: Envelope with count and list of factories.
     """
     try:
         df = _load_factories_data()
 
         if df.empty:
-            return []
+            return {"count": 0, "items": []}
 
         if city:
             df = df[df["city"].str.lower() == city.lower()]
@@ -118,7 +118,7 @@ def get_factories(city: Optional[str] = Query(None), limit: int = Query(100, ge=
                 country=str(row.get("country", "")),
             )
             factories.append(factory)
-        return factories
+        return {"count": len(factories), "items": factories}
 
     except Exception as e:
         logger.error("Error fetching factories: %s", e)
@@ -191,7 +191,7 @@ def predict_pollution_impact(request: PollutionImpactPredictionRequest):
             )
 
         # Start from request data
-        features_dict = request.dict()
+        features_dict = request.model_dump()
         # Align request features with the model's expected feature list to avoid
         # missing-column errors during prediction.
         feature_list = _load_model_feature_list()
