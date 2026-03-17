@@ -1,6 +1,17 @@
+# Complete production dependencies for Render deployment
+# Python 3.9.21
+
+# Core web framework
 fastapi==0.104.1
 uvicorn==0.24.0
 python-multipart==0.0.6
+
+# Pydantic and settings
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy==2.0.23
 
 # Data processing - pinned for Python 3.9-3.11 compatibility
 pandas==2.0.3
@@ -17,12 +28,8 @@ httpx==0.25.0
 
 # Utilities
 python-dotenv==1.0.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
 pyyaml==6.0.1
-
-# Date/time
 python-dateutil==2.8.2
 
-# Optional geospatial
+# Geospatial
 geopy==2.3.0
