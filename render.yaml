@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: smart-factory-api
+    runtime: python
+    plan: free
+    autoDeploy: false
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: ENVIRONMENT
+        value: production
+      - key: PYTHONPATH
+        value: .

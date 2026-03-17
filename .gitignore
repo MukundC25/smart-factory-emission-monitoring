@@ -25,3 +25,5 @@ node_modules/
 frontend-vite/node_modules/
 frontend-vite/dist/
 frontend-vite/.vite/
+.vercel
+.env*.local
