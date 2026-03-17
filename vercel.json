@@ -1,22 +1,9 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "frontend-vite/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "frontend-vite/dist"
-      }
-    },
-    {
-      "src": "backend/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb",
-        "runtime": "python3.9"
-      }
-    }
-  ],
+  "outputDirectory": "frontend-vite/dist",
+  "framework": "vite",
+  "buildCommand": "cd frontend-vite && npm install && npm run build",
+  "installCommand": "cd frontend-vite && npm install",
   "routes": [
     {
       "src": "/api/(.*)",
@@ -35,11 +22,27 @@
       "dest": "backend/main.py"
     },
     {
+      "src": "/factories/(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/recommendations(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/tree-calculator(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/pollution(.*)",
+      "dest": "backend/main.py"
+    },
+    {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend-vite/dist/$1"
+      "dest": "/$1"
     }
   ],
   "env": {
