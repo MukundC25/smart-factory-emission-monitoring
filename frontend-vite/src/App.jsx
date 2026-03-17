@@ -1281,7 +1281,7 @@ function FuturePredictionView({ factories, selectedFactoryId }) {
     datasets: [
       {
         label: 'Predicted Score',
-        data: prediction.predictions.map(p => p.predicted_score),
+        data: prediction.predictions.map(p => p.predicted_score * 10),
         borderColor: '#3B82F6',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         fill: false,
@@ -1289,7 +1289,7 @@ function FuturePredictionView({ factories, selectedFactoryId }) {
       },
       {
         label: 'Confidence Upper',
-        data: prediction.predictions.map(p => p.confidence_upper),
+        data: prediction.predictions.map(p => p.confidence_upper * 10),
         borderColor: 'rgba(59, 130, 246, 0.3)',
         borderDash: [3, 3],
         fill: false,
@@ -1297,7 +1297,7 @@ function FuturePredictionView({ factories, selectedFactoryId }) {
       },
       {
         label: 'Confidence Lower',
-        data: prediction.predictions.map(p => p.confidence_lower),
+        data: prediction.predictions.map(p => p.confidence_lower * 10),
         borderColor: 'rgba(59, 130, 246, 0.3)',
         borderDash: [3, 3],
         fill: false,
@@ -1430,7 +1430,7 @@ function SolutionView({ factories, selectedFactoryId }) {
       if (!factory) return
       setLoadingTrees(true)
       try {
-        const response = await fetch(`${API_BASE_URL}/tree-calculator/${factory.factory_id}`)
+        const response = await fetch(`${API_BASE_URL}/factories/${factory.factory_id}/tree-recommendation`)
         if (response.ok) {
           const data = await response.json()
           setTreeData(data)
