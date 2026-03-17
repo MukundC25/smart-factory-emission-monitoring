@@ -1367,21 +1367,23 @@ function FuturePredictionView({ factories, selectedFactoryId }) {
         </div>
       </div>
 
-      <div className="chart-container">
-        <Line
-          data={chartData}
-          options={{
-            responsive: true,
-            plugins: {
-              legend: { labels: { color: '#2D3748' } },
-              title: { display: true, text: '10-Year Pollution Forecast', color: '#2D3748' },
-            },
-            scales: {
-              x: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' } },
-              y: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' }, min: 0, max: 100 },
-            },
-          }}
-        />
+      <div className="blur-wrapper">
+        <div className="chart-container">
+          <Line
+            data={chartData}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: { labels: { color: '#2D3748' } },
+                title: { display: true, text: '10-Year Pollution Forecast', color: '#2D3748' },
+              },
+              scales: {
+                x: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+                y: { ticks: { color: '#718096' }, grid: { color: 'rgba(0,0,0,0.05)' }, min: 0, max: 100 },
+              },
+            }}
+          />
+        </div>
       </div>
       
       <NavArrows onBack={goBack} onNext={goNext} canGoBack={canGoBack} />
