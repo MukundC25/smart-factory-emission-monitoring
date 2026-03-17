@@ -7,6 +7,7 @@ Run with:
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -18,6 +19,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from backend.app.services.openaq_service import OpenAQService, get_openaq_service, set_openaq_service
 from backend.config import get_settings
 from backend.dependencies import get_data_loader
 from backend.utils.data_loader import DataLoader
@@ -55,6 +57,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
         else:
             logger.info("Dataset '%s' loaded: %d rows.", name, count)
+    
+    # Initialize OpenAQ service
+    api_key = os.getenv("OPENAQ_API_KEY")
+    openaq_service = OpenAQService(api_key=api_key)
+    set_openaq_service(openaq_service)
+    app.state.openaq = openaq_service
+    logger.info("OpenAQ service initialized (API key: %s)", "configured" if api_key else "none")
+    
     try:
         yield
     finally:
