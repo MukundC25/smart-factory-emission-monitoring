@@ -27,6 +27,7 @@ from backend.routers.factories import router as factories_router
 from backend.routers.pollution import router as pollution_router
 from backend.routers.recommendations import router as recommendations_router
 from backend.routers.tree_calculator import router as tree_calculator_router
+from backend.app.routes.factories import router as ml_factories_router
 
 settings = get_settings()
 
@@ -105,6 +106,7 @@ app.add_middleware(
 # Routers
 # ---------------------------------------------------------------------------
 app.include_router(factories_router)
+app.include_router(ml_factories_router)  # ML prediction endpoints
 app.include_router(pollution_router)
 app.include_router(recommendations_router)
 app.include_router(tree_calculator_router)

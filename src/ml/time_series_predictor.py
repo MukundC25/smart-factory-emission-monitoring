@@ -416,13 +416,28 @@ class PollutionForecastModel:
 
         # Generate monthly predictions and aggregate to yearly
         monthly_scores = []
+        predicted_scores = [current_score]  # Track predictions for lag features
 
         for month_offset in range(years_ahead * 12):
             year = base_year + month_offset // 12
             month = (month_offset % 12) + 1
             time_index = current_time_index + month_offset
 
-            # Build feature row
+            # Get lag values from previous predictions
+            score_lag_1 = predicted_scores[-1] if len(predicted_scores) >= 1 else current_score
+            score_lag_3 = predicted_scores[-3] if len(predicted_scores) >= 3 else current_score
+            score_rolling_mean_3 = np.mean(predicted_scores[-3:]) if len(predicted_scores) >= 3 else current_score
+
+            # Apply growth factors over time for dynamic predictions
+            time_factor = 1.0 + (month_offset / (years_ahead * 12)) * 0.2  # 20% growth over full period
+            growth_rate = INDUSTRY_GROWTH_RATES.get(industry, 1.5) / 100  # Convert to decimal
+            urbanization_rate = (CITY_URBANIZATION.get(city, 1.02) - 1.0)  # Excess over 1.0
+            
+            # Pollutant levels evolve based on previous score and growth
+            base_pm25 = 20 + score_lag_1 * 15
+            base_pm10 = 40 + score_lag_1 * 20
+            
+            # Build feature row with dynamic values
             feature_row = {
                 "time_index": time_index,
                 "year_norm": (year - 2020) / 10.0,
@@ -430,18 +445,18 @@ class PollutionForecastModel:
                 "month_cos": np.cos(2 * np.pi * month / 12),
                 "industry_growth": INDUSTRY_GROWTH_RATES.get(industry, 1.5),
                 "city_urbanization": CITY_URBANIZATION.get(city, 1.02),
-                # Use current pollutant levels or estimates
-                "pm25": 20 + current_score * 15,
-                "pm10": 40 + current_score * 20,
-                "co": 0.5 + current_score * 0.3,
-                "no2": 15 + current_score * 8,
-                "so2": 8 + current_score * 4,
-                "o3": 20 + current_score * 5,
-                "rolling_avg_pm25_7d": 20 + current_score * 15,
-                "rolling_avg_pm25_30d": 20 + current_score * 15,
-                "score_lag_1": current_score,
-                "score_lag_3": current_score,
-                "score_rolling_mean_3": current_score,
+                # Pollutant levels evolve over time
+                "pm25": base_pm25 * (1 + growth_rate * month_offset / 12),
+                "pm10": base_pm10 * (1 + growth_rate * month_offset / 12),
+                "co": (0.5 + score_lag_1 * 0.3) * time_factor,
+                "no2": (15 + score_lag_1 * 8) * (1 + urbanization_rate * month_offset / 12),
+                "so2": (8 + score_lag_1 * 4) * time_factor,
+                "o3": (20 + score_lag_1 * 5) * time_factor,
+                "rolling_avg_pm25_7d": base_pm25 * (1 + growth_rate * month_offset / 12),
+                "rolling_avg_pm25_30d": base_pm25 * (1 + growth_rate * month_offset / 12),
+                "score_lag_1": score_lag_1,
+                "score_lag_3": score_lag_3,
+                "score_rolling_mean_3": score_rolling_mean_3,
                 "industry_type": industry,
                 "city": city,
             }
@@ -456,6 +471,9 @@ class PollutionForecastModel:
 
             # Clip to valid range
             pred = np.clip(pred, 0.0, 10.0)
+            
+            # Store prediction for next iteration's lag features
+            predicted_scores.append(pred)
             monthly_scores.append({"year": year, "month": month, "score": pred})
 
         # Aggregate to yearly with confidence intervals
@@ -522,12 +540,19 @@ class PollutionForecastModel:
 
     def save(self, path: Path) -> None:
         """Save model to disk."""
-        if not self.is_trained:
-            raise RuntimeError("Cannot save untrained model")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Serialize metrics as dict to avoid pickle issues
+        metrics_dict = None
+        if self.metrics is not None:
+            metrics_dict = {
+                "rmse": self.metrics.rmse,
+                "mae": self.metrics.mae,
+                "r2": self.metrics.r2,
+            }
         joblib.dump(
             {
                 "model": self.model,
-                "metrics": self.metrics,
+                "metrics": metrics_dict,
                 "feature_cols": self.feature_cols,
                 "is_trained": self.is_trained,
             },
@@ -538,7 +563,16 @@ class PollutionForecastModel:
         """Load model from disk."""
         data = joblib.load(path)
         self.model = data["model"]
-        self.metrics = data["metrics"]
+        # Reconstruct ModelMetrics from dict
+        metrics_dict = data.get("metrics")
+        if metrics_dict is not None and isinstance(metrics_dict, dict):
+            self.metrics = ModelMetrics(
+                rmse=metrics_dict["rmse"],
+                mae=metrics_dict["mae"],
+                r2=metrics_dict["r2"],
+            )
+        else:
+            self.metrics = metrics_dict  # Backward compatibility
         self.feature_cols = data["feature_cols"]
         self.is_trained = data["is_trained"]
 
