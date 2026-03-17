@@ -28,6 +28,15 @@ class OpenAQService:
     def get_latest_aqi(self, city: str, lat: float, lon: float) -> Dict[str, Any]:
         """Get latest AQI data for a location.
 
+        This method performs a synchronous HTTP request using ``requests`` and
+        will block while waiting for the OpenAQ API response.
+
+        When calling this service from an async context (e.g., an async FastAPI
+        endpoint), you **must** run it in a thread or process executor
+        (such as ``loop.run_in_executor``) to avoid blocking the event loop.
+
+        See the usage pattern in ``tree_calculator.py`` for an example.
+
         Args:
             city: City name for fallback lookup.
             lat: Latitude coordinate.
@@ -117,7 +126,7 @@ class OpenAQService:
                 "category": self._aqi_category(aqi),
             }
 
-        return {"aqi": 0, "pm25": 0, "pm10": 0, "category": "Unknown"}
+        return {"aqi": 0, "pm25": None, "pm10": None, "category": "Unknown"}
 
     @staticmethod
     def _pm25_to_aqi(pm25: float) -> int:
@@ -207,8 +216,8 @@ class OpenAQService:
         LOGGER.warning("Using fallback AQI data for %s", city)
         return {
             "aqi": 0,
-            "pm25": 0,
-            "pm10": 0,
+            "pm25": None,
+            "pm10": None,
             "category": "Unknown",
             "source": "fallback",
         }

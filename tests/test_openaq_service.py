@@ -153,13 +153,52 @@ class TestOpenAQService:
         assert result["pm10"] is None
         assert result["category"] == "Unknown"
 
-    def test_cache_functionality(self, service):
+    def test_cache_functionality(self, service, monkeypatch):
         """Test that caching works correctly."""
-        # First call should cache
+        # Mock the underlying HTTP call so no real network request is made
+        call_counter = {"count": 0}
+
+        class DummyResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "results": [
+                        {
+                            "measurements": [
+                                {"parameter": "pm25", "value": 12.0},
+                                {"parameter": "pm10", "value": 30.0},
+                            ]
+                        }
+                    ]
+                }
+
+        def fake_get(*args, **kwargs):
+            call_counter["count"] += 1
+            return DummyResponse()
+
+        # Patch the requests.get used inside OpenAQService
+        monkeypatch.setattr(
+            "backend.app.services.openaq_service.requests.get",
+            fake_get,
+        )
+
+        # First call should populate the cache and hit the mocked API once
         result1 = service.get_latest_aqi("TestCity", 0.0, 0.0)
-        # Second call should return cached result (unless API succeeds)
-        # We can't fully test this without mocking the API response
-        # but we can verify the cache structure exists
+
+        # Second call with same parameters should use the cache
+        result2 = service.get_latest_aqi("TestCity", 0.0, 0.0)
+
+        # Verify that the external HTTP call was made only once
+        assert call_counter["count"] == 1
+
+        # Cached result should be the same as the first result
+        assert result1 == result2
+
+        # And the cache structure should exist and be a dictionary
         assert hasattr(service, "_cache")
         assert isinstance(service._cache, dict)
 
@@ -175,22 +214,29 @@ class TestOpenAQService:
         """Test fallback AQI when API fails."""
         result = service._fallback_aqi("TestCity")
         assert result["aqi"] == 0
-        assert result["pm25"] == 0
-        assert result["pm10"] == 0
+        assert result["pm25"] is None
+        assert result["pm10"] is None
         assert result["category"] == "Unknown"
         assert result["source"] == "fallback"
 
     def test_service_singleton(self):
         """Test that get_openaq_service returns singleton."""
         from backend.app.services.openaq_service import get_openaq_service, set_openaq_service
-        
-        # Create and set a service
-        service1 = OpenAQService()
-        set_openaq_service(service1)
-        
-        # Get should return same instance
-        service2 = get_openaq_service()
-        assert service1 is service2
+
+        # Preserve original singleton to avoid leaking state to other tests
+        original_service = get_openaq_service()
+
+        try:
+            # Create and set a service
+            service1 = OpenAQService()
+            set_openaq_service(service1)
+
+            # Get should return same instance
+            service2 = get_openaq_service()
+            assert service1 is service2
+        finally:
+            # Restore original singleton
+            set_openaq_service(original_service)
 
     def test_service_initialization_with_api_key(self):
         """Test OpenAQService initialization with API key."""

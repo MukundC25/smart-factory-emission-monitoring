@@ -19,7 +19,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.app.services.openaq_service import OpenAQService, get_openaq_service, set_openaq_service
+from backend.app.services.openaq_service import OpenAQService, set_openaq_service
 from backend.config import get_settings
 from backend.dependencies import get_data_loader
 from backend.utils.data_loader import DataLoader
