@@ -1,0 +1,27 @@
+{
+  "rmse": 0.14546743897737346,
+  "mae": 0.11504745540863515,
+  "r2": 0.9924701239325168,
+  "feature_count": 19,
+  "features": [
+    "time_index",
+    "year_norm",
+    "month_sin",
+    "month_cos",
+    "industry_growth",
+    "city_urbanization",
+    "pm25",
+    "pm10",
+    "co",
+    "no2",
+    "so2",
+    "o3",
+    "rolling_avg_pm25_7d",
+    "rolling_avg_pm25_30d",
+    "score_lag_1",
+    "score_lag_3",
+    "score_rolling_mean_3",
+    "industry_type",
+    "city"
+  ]
+}
