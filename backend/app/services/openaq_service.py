@@ -2,6 +2,7 @@
 
 import logging
 import os
+import threading
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
@@ -24,6 +25,7 @@ class OpenAQService:
         """
         self.api_key = api_key or os.getenv("OPENAQ_API_KEY")
         self._cache: Dict[str, tuple] = {}
+        self._cache_lock = threading.Lock()
 
     def get_latest_aqi(self, city: str, lat: float, lon: float) -> Dict[str, Any]:
         """Get latest AQI data for a location.
@@ -47,9 +49,11 @@ class OpenAQService:
         """
         cache_key = f"{city}_{lat}_{lon}"
 
-        # Check cache
-        if cache_key in self._cache:
-            cached_data, timestamp = self._cache[cache_key]
+        # Check cache (with lock for thread safety)
+        with self._cache_lock:
+            cached_entry = self._cache.get(cache_key)
+        if cached_entry is not None:
+            cached_data, timestamp = cached_entry
             if datetime.now() - timestamp < timedelta(seconds=self.CACHE_TTL):
                 LOGGER.info("Returning cached AQI data for %s", city)
                 return cached_data
@@ -78,8 +82,9 @@ class OpenAQService:
             aqi_data = self._calculate_aqi(measurements)
             aqi_data["source"] = "openaq"
 
-            # Cache result
-            self._cache[cache_key] = (aqi_data, datetime.now())
+            # Cache result (with lock for thread safety)
+            with self._cache_lock:
+                self._cache[cache_key] = (aqi_data, datetime.now())
             LOGGER.info("Fetched and cached AQI data for %s: AQI=%s", city, aqi_data["aqi"])
             return aqi_data
 
@@ -138,6 +143,8 @@ class OpenAQService:
         Returns:
             AQI value (0-500).
         """
+        # Truncate to 1 decimal place per EPA specification to avoid breakpoint gaps
+        pm25 = int(pm25 * 10) / 10.0
         # EPA AQI breakpoints for PM2.5
         if pm25 <= 12.0:
             return int((50 / 12.0) * pm25)
@@ -165,6 +172,8 @@ class OpenAQService:
         Returns:
             AQI value (0-500).
         """
+        # Truncate to integer per EPA specification to avoid breakpoint gaps
+        pm10 = int(pm10)
         # EPA AQI breakpoints for PM10
         if pm10 <= 54:
             return int((50 / 54) * pm10)
@@ -224,7 +233,8 @@ class OpenAQService:
 
     def clear_cache(self) -> None:
         """Clear the cache."""
-        self._cache.clear()
+        with self._cache_lock:
+            self._cache.clear()
         LOGGER.info("Cache cleared")
 
 
