@@ -1318,7 +1318,7 @@ function FuturePredictionView({ factories, selectedFactoryId }) {
     <div className="floating-content">
       <div className="section-label">Step 7 / 8</div>
       <h1 className="page-title">AI Pollution Forecast</h1>
-      <p className="page-subtitle">{factory.factory_name} • LSTM Time-Series Model</p>
+      <p className="page-subtitle">{factory.factory_name} • Gradient Boosting Forecast Model</p>
       
       <div className="blur-wrapper" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
@@ -1362,7 +1362,7 @@ function FuturePredictionView({ factories, selectedFactoryId }) {
              'Pollution levels expected to remain stable')}
           </div>
           <div style={{ fontSize: '0.75rem', color: '#718096', marginTop: '0.5rem', fontStyle: 'italic' }}>
-            ✓ Prediction from trained LSTM model (pollution_forecast_model.pkl)
+            ✓ Prediction from trained Gradient Boosting model (pollution_forecast_model.pkl)
           </div>
         </div>
       </div>
